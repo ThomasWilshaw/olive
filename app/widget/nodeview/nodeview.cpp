@@ -61,12 +61,17 @@ NodeView::NodeView(QWidget *parent) :
   select_blocks_internal_timer_.setSingleShot(true);
   select_blocks_internal_timer_.setInterval(100);
   connect(&select_blocks_internal_timer_, &QTimer::timeout, this, &NodeView::SelectBlocksInternal);
+
+  search_ = new NodeViewSearch(this);
+  connect(search_, &NodeViewSearch::CreateNode, this, &NodeView::CreateNodeSlot);
 }
 
 NodeView::~NodeView()
 {
   // Unset the current graph
   SetGraph(nullptr);
+
+  delete search_;
 }
 
 void NodeView::SetGraph(NodeGraph *graph)
@@ -103,6 +108,8 @@ void NodeView::SetGraph(NodeGraph *graph)
     }
 
     ValidateFilter();
+
+    search_->SetGraph(graph);
   }
 }
 
@@ -346,6 +353,12 @@ void NodeView::keyPressEvent(QKeyEvent *event)
     // We undo the last action which SHOULD be adding the node
     // FIXME: Possible danger of this not being the case?
     Core::instance()->undo_stack()->undo();
+  }
+
+  if (event->key() == Qt::Key_A) {
+    if (graph_) {
+      search_->PopUp();
+    }
   }
 }
 
@@ -605,7 +618,7 @@ void NodeView::ShowContextMenu(const QPoint &pos)
 
     Menu* add_menu = NodeFactory::CreateMenu(&m);
     add_menu->setTitle(tr("Add"));
-    connect(add_menu, &Menu::triggered, this, &NodeView::CreateNodeSlot);
+    connect(add_menu, &Menu::triggered, this, &NodeView::CreateNodeSlotFromAction);
     m.addMenu(add_menu);
 
   }
@@ -613,20 +626,25 @@ void NodeView::ShowContextMenu(const QPoint &pos)
   m.exec(mapToGlobal(pos));
 }
 
-void NodeView::CreateNodeSlot(QAction *action)
+void NodeView::CreateNodeSlot(Node* node)
+{
+  if (node) {
+    // Associate this new node with these blocks (allows it to be visible with them even while it
+    // isn't connected to anything)
+    AssociateNodeWithSelectedBlocks(node);
+
+    Core::instance()->undo_stack()->push(new NodeAddCommand(graph_, node));
+
+    NodeViewItem* item = scene_.NodeToUIObject(node);
+    AttachItemsToCursor({item});
+  }
+}
+
+void NodeView::CreateNodeSlotFromAction(QAction* action)
 {
   Node* new_node = NodeFactory::CreateFromMenuAction(action);
 
-  if (new_node) {
-    // Associate this new node with these blocks (allows it to be visible with them even while it
-    // isn't connected to anything)
-    AssociateNodeWithSelectedBlocks(new_node);
-
-    Core::instance()->undo_stack()->push(new NodeAddCommand(graph_, new_node));
-
-    NodeViewItem* item = scene_.NodeToUIObject(new_node);
-    AttachItemsToCursor({item});
-  }
+  CreateNodeSlot(new_node);
 }
 
 void NodeView::ContextMenuSetDirection(QAction *action)

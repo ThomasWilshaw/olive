@@ -224,4 +224,17 @@ Node *NodeFactory::CreateFromFactoryIndex(const NodeFactory::InternalID &id)
   abort();
 }
 
+QMap<QString, QString> NodeFactory::NodeTypes()
+{
+  QMap<QString, QString> node_types;
+
+  for (int i = 0; i < library_.size(); i++) {
+    Node* n = library_.at(i);
+    node_types.insert(n->Name(), n->id());
+  }
+
+  return node_types;
+}
+
+
 OLIVE_NAMESPACE_EXIT

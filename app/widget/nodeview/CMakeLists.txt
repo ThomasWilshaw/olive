@@ -25,6 +25,8 @@ set(OLIVE_SOURCES
   widget/nodeview/nodeviewitem.cpp
   widget/nodeview/nodeviewitemwidgetproxy.h
   widget/nodeview/nodeviewitemwidgetproxy.cpp
+  widget/nodeview/nodeviewsearch.h
+  widget/nodeview/nodeviewsearch.cpp
   widget/nodeview/nodeviewscene.h
   widget/nodeview/nodeviewscene.cpp
   widget/nodeview/nodeviewundo.h

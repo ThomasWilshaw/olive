@@ -25,6 +25,7 @@
 #include <QTimer>
 
 #include "node/graph.h"
+#include "nodeviewsearch.h"
 #include "nodeviewscene.h"
 #include "widget/timelinewidget/view/handmovableview.h"
 #include "widget/nodecopypaste/nodecopypaste.h"
@@ -129,6 +130,8 @@ private:
 
   QHash<Block*, QList<Node*> > temporary_association_map_;
 
+  NodeViewSearch* search_;
+
   enum FilterMode {
     kFilterShowAll,
     kFilterShowSelectedBlocks
@@ -166,10 +169,16 @@ private slots:
    */
   void ShowContextMenu(const QPoint &pos);
 
+  
+  /**
+   * @brief Receiver for when the user requests a new node
+   */
+  void CreateNodeSlot(Node* node);
+
   /**
    * @brief Receiver for when the user requests a new node from the add menu
    */
-  void CreateNodeSlot(QAction* action);
+  void CreateNodeSlotFromAction(QAction* action);
 
   /**
    * @brief Receiver for setting the direction from the context menu

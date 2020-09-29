@@ -75,6 +75,8 @@ public:
 
   static Node* CreateFromFactoryIndex(const InternalID& id);
 
+  static QMap<QString, QString> NodeTypes();
+
 private:
   static QList<Node*> library_;
 
