@@ -23,6 +23,9 @@
 
 #include <QCompleter>
 #include <QLineEdit>
+#include <QFocusEvent>
+#include <QMouseEvent>
+#include <QKeyEvent>
 
 #include "common/define.h"
 #include "node/graph.h"
@@ -42,8 +45,22 @@ public:
 
   void SetScene(NodeViewScene* scene);
 
+  void Disappear();
+
 signals:
   void CreateNode(Node* node);
+
+protected:
+  virtual void focusOutEvent(QFocusEvent*) override;
+
+  virtual void leaveEvent(QEvent* event) override;
+
+  virtual bool eventFilter(QObject* object, QEvent* event) override;
+
+  //Required to let event filter work
+  virtual void mouseMoveEvent(QMouseEvent* e) override { e->ignore(); }
+
+  virtual void keyPressEvent(QKeyEvent* event) override;
 
 private:
   void GenerateNode();

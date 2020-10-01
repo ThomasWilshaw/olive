@@ -37,10 +37,13 @@ NodeViewSearch::NodeViewSearch(QWidget* parent) :
   comp_ = new QCompleter(node_types_.keys(), this);
   comp_->setCaseSensitivity(Qt::CaseInsensitive);
   comp_->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
-  comp_->setMaxVisibleItems(3);
+  //Set Focus proxy to keep mouse evnt workin when completer pops up
   this->setCompleter(comp_);
 
   connect(this, &NodeViewSearch::returnPressed, this, &NodeViewSearch::GenerateNode);
+
+  this->setMouseTracking(true);
+  parent_->installEventFilter(this);
 };
 
 void NodeViewSearch::PopUp()
@@ -76,9 +79,62 @@ void NodeViewSearch::GenerateNode()
     }
   }
 
+  Disappear();
+}
+
+void NodeViewSearch::Disappear() {
   this->hide();
   this->setText("");
   parent_->setFocus();
+}
+
+void NodeViewSearch::focusOutEvent(QFocusEvent*)
+{
+  Disappear();
+}
+
+void NodeViewSearch::leaveEvent(QEvent* event)
+{ 
+  //Disappear();
+  // check not on popup menu eaither
+}
+
+bool NodeViewSearch::eventFilter(QObject* object, QEvent* event)
+{
+  if (event->type() == QEvent::MouseMove) {
+    if (this->isVisible()) {
+      QPoint cursor_pos = QCursor::pos();
+      QPoint this_pos = parent_->mapToGlobal(this->pos());
+      
+      if (cursor_pos.x() > (this_pos.x() + this->width()/2 + 100)) {
+        Disappear();
+      }
+      if (cursor_pos.x() < (this_pos.x() + this->width() / 2 - 100)) {
+        Disappear();
+      }
+      if (cursor_pos.y() < (this_pos.y() + this->height() / 2 - 50)) {
+        Disappear();
+      }
+      if (cursor_pos.y() > (this_pos.y() + this->height() / 2 + 50)) {
+        Disappear();
+      }
+    }
+    return false;
+  } else {
+    // standard event processing
+    return QObject::eventFilter(object, event);
+  }
+}
+
+void NodeViewSearch::keyPressEvent(QKeyEvent* event)
+{
+  if (event->key() == Qt::Key_Escape) {
+    Disappear();
+  }
+
+  // https://doc-snapshots.qt.io/qt5-5.15/qcompleter.html#setCurrentRow plus arrow key to modify maybe?
+
+  QLineEdit::keyPressEvent(event);
 }
 
 OLIVE_NAMESPACE_EXIT

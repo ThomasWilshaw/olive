@@ -355,7 +355,7 @@ void NodeView::keyPressEvent(QKeyEvent *event)
     Core::instance()->undo_stack()->undo();
   }
 
-  if (event->key() == Qt::Key_A) {
+  if ((event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_A) {
     if (graph_) {
       search_->PopUp();
     }
@@ -447,6 +447,8 @@ void NodeView::mouseMoveEvent(QMouseEvent *event)
       }
     }
   }
+  // Pass event on to child widgets, eg search_
+  QWidget::mousePressEvent(event);
 }
 
 void NodeView::mouseReleaseEvent(QMouseEvent *event)
