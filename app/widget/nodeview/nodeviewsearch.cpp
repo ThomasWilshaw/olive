@@ -36,13 +36,14 @@ NodeViewSearch::NodeViewSearch(QWidget* parent) :
 
   comp_ = new QCompleter(node_types_.keys(), this);
   comp_->setCaseSensitivity(Qt::CaseInsensitive);
-  comp_->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
+  comp_->setCompletionMode(QCompleter::PopupCompletion);
   //Set Focus proxy to keep mouse evnt workin when completer pops up
   this->setCompleter(comp_);
 
   connect(this, &NodeViewSearch::returnPressed, this, &NodeViewSearch::GenerateNode);
 
   this->setMouseTracking(true);
+
   parent_->installEventFilter(this);
 };
 
@@ -57,6 +58,8 @@ void NodeViewSearch::PopUp()
   this->show();
   this->setFocus();
   this->activateWindow();
+
+  parent_->setMouseTracking(true);
 }
 
 void NodeViewSearch::SetGraph(NodeGraph* graph)
@@ -75,7 +78,9 @@ void NodeViewSearch::GenerateNode()
   if (this->text() != QString("")) {
     Node* new_node = NodeFactory::CreateFromID(node_types_[comp_->currentCompletion()]);
     if (new_node) {
+      Disappear();
       emit CreateNode(new_node);
+      return;
     }
   }
 
@@ -86,6 +91,7 @@ void NodeViewSearch::Disappear() {
   this->hide();
   this->setText("");
   parent_->setFocus();
+  parent_->setMouseTracking(false);
 }
 
 void NodeViewSearch::focusOutEvent(QFocusEvent*)
@@ -101,6 +107,7 @@ void NodeViewSearch::leaveEvent(QEvent* event)
 
 bool NodeViewSearch::eventFilter(QObject* object, QEvent* event)
 {
+  //printf("%d\n", QCursor::pos().x());
   if (event->type() == QEvent::MouseMove) {
     if (this->isVisible()) {
       QPoint cursor_pos = QCursor::pos();

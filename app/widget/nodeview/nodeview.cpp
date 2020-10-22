@@ -22,6 +22,7 @@
 
 #include <QInputDialog>
 #include <QMouseEvent>
+#include <QWidgetAction>
 
 #include "core.h"
 #include "nodeviewundo.h"
@@ -360,6 +361,7 @@ void NodeView::keyPressEvent(QKeyEvent *event)
       search_->PopUp();
     }
   }
+  QWidget::keyPressEvent(event);
 }
 
 void NodeView::mousePressEvent(QMouseEvent *event)
@@ -447,8 +449,9 @@ void NodeView::mouseMoveEvent(QMouseEvent *event)
       }
     }
   }
+  printf("%d\n", QCursor::pos().x());
   // Pass event on to child widgets, eg search_
-  QWidget::mousePressEvent(event);
+  QWidget::mouseMoveEvent(event);
 }
 
 void NodeView::mouseReleaseEvent(QMouseEvent *event)
@@ -551,6 +554,31 @@ void NodeView::ShowContextMenu(const QPoint &pos)
 
   Menu m;
 
+  // Node search bar
+  QLineEdit* node_search = new QLineEdit();
+  node_search->setStyleSheet("color: black;  background-color: white");
+  node_search->setPlaceholderText(tr("Search node..."));
+  // Force line edit to take focus once menu is drawn
+  QTimer::singleShot(0, node_search, SLOT(setFocus()));
+
+  QWidgetAction* search_bar_action = new QWidgetAction(this);
+  search_bar_action->setDefaultWidget(node_search);
+
+  QCompleter* comp = new QCompleter(NodeFactory::NodeTypes().keys(), this);
+  comp->setCaseSensitivity(Qt::CaseInsensitive);
+  comp->setCompletionMode(QCompleter::InlineCompletion);
+  node_search->setCompleter(comp);
+
+  
+  connect(node_search, &QLineEdit::returnPressed, this,
+          [this,comp]() { NodeView::CreateNodeSlotFromSearch(comp->currentCompletion()); });
+  connect(node_search, &QLineEdit::returnPressed, &m, &QMenu::hide);
+  
+
+  m.addAction(search_bar_action);
+
+  m.addSeparator();
+
   MenuShared::instance()->AddItemsForEditMenu(&m, false);
 
   m.addSeparator();
@@ -624,7 +652,6 @@ void NodeView::ShowContextMenu(const QPoint &pos)
     m.addMenu(add_menu);
 
   }
-
   m.exec(mapToGlobal(pos));
 }
 
@@ -647,6 +674,16 @@ void NodeView::CreateNodeSlotFromAction(QAction* action)
   Node* new_node = NodeFactory::CreateFromMenuAction(action);
 
   CreateNodeSlot(new_node);
+}
+
+void NodeView::CreateNodeSlotFromSearch(QString id)
+{
+  if (id != QString("")) {
+    Node* new_node = NodeFactory::CreateFromID(NodeFactory::NodeTypes()[id]);
+    if (new_node) {
+      CreateNodeSlot(new_node);
+    }
+  }
 }
 
 void NodeView::ContextMenuSetDirection(QAction *action)

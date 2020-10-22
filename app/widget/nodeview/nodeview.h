@@ -106,6 +106,8 @@ private:
 
   void QueueSelectBlocksInternal();
 
+  void PopUpNodeSearch();
+
   QTimer select_blocks_internal_timer_;
 
   NodeGraph* graph_;
@@ -179,6 +181,11 @@ private slots:
    * @brief Receiver for when the user requests a new node from the add menu
    */
   void CreateNodeSlotFromAction(QAction* action);
+
+  /**
+   * @brief Receiver for when the user requests a new node from the search bar
+   */
+  void CreateNodeSlotFromSearch(QString id);
 
   /**
    * @brief Receiver for setting the direction from the context menu

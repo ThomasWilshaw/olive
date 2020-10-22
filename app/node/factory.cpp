@@ -228,6 +228,9 @@ QMap<QString, QString> NodeFactory::NodeTypes()
 {
   QMap<QString, QString> node_types;
 
+  // Empty value so QCompleters default to nothing
+  node_types.insert("", "");
+
   for (int i = 0; i < library_.size(); i++) {
     Node* n = library_.at(i);
     node_types.insert(n->Name(), n->id());
