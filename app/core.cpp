@@ -1,5 +1,4 @@
 /***
-/***
 
   Olive - Non-Linear Video Editor
   Copyright (C) 2020 Olive Team

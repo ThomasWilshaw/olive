@@ -25,13 +25,10 @@
 #include "dialog/sequence/sequence.h"
 #include "core.h"
 
-OLIVE_NAMESPACE_ENTER
+namespace olive {
 
 OTIOPropertiesDialog::OTIOPropertiesDialog(QList<SequencePtr> sequences, ProjectPtr active_project, QWidget* parent)
-    :
-	QDialog(parent),
-    sequences_(sequences)
-{
+    : QDialog(parent), sequences_(sequences) {
   QVBoxLayout* layout = new QVBoxLayout(this);
 
   layout->addWidget(new QLabel("Change settings for each OTIO sequence to be loaded"));
@@ -68,8 +65,7 @@ OTIOPropertiesDialog::OTIOPropertiesDialog(QList<SequencePtr> sequences, Project
   setWindowTitle(tr("Load OTIO File"));
 }
 
-void OTIOPropertiesDialog::SetupSequence()
-{
+void OTIOPropertiesDialog::SetupSequence() {
   int index = sender()->property("index").toInt();
   SequencePtr s = sequences_.at(index);
   SequenceDialog sd(s.get(), SequenceDialog::kNew);
@@ -77,4 +73,4 @@ void OTIOPropertiesDialog::SetupSequence()
   sd.exec();
 }
 
-OLIVE_NAMESPACE_EXIT
+}  // namespace olive
