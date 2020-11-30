@@ -27,7 +27,7 @@
 
 namespace olive {
 
-OTIOPropertiesDialog::OTIOPropertiesDialog(QList<SequencePtr> sequences, ProjectPtr active_project, QWidget* parent)
+OTIOPropertiesDialog::OTIOPropertiesDialog(QList<SequencePtr> sequences, Project* active_project, QWidget* parent)
     : QDialog(parent), sequences_(sequences) {
   QVBoxLayout* layout = new QVBoxLayout(this);
 

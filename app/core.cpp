@@ -365,7 +365,7 @@ void Core::DialogExportShow()
 
 void Core::DialogImportOTIOShow(QList<SequencePtr> sequences)
 {
-  ProjectPtr active_project = GetActiveProject();
+  Project* active_project = GetActiveProject();
   OTIOPropertiesDialog opd(sequences, active_project);
   opd.exec();
 }

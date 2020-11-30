@@ -202,7 +202,7 @@ bool LoadOTIOTask::Run()
             if (imported_footage.contains(footage_url)) {
               probed_item = imported_footage.value(footage_url);
             } else {
-              probed_item = Decoder::Probe(project_.get(), footage_url, &IsCancelled());
+              probed_item = Decoder::Probe(project_, footage_url, &IsCancelled());
               if (!probed_item) {
                 // Failed to decode footage. As we're importing an OTIO file this implies the footage just needs to be relinked
                 // so we create a empty footage object here. This triggers the relink dialog later.
@@ -212,7 +212,7 @@ bool LoadOTIOTask::Run()
                 probed_item->set_name(file_info.fileName());
                 probed_item->set_filename(footage_url);
 
-                probed_item->set_project(project_.get());
+                probed_item->set_project(project_);
                 probed_item->set_timestamp(file_info.lastModified().toMSecsSinceEpoch());
               }
 

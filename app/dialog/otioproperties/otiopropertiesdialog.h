@@ -38,7 +38,7 @@ namespace olive {
 class OTIOPropertiesDialog : public QDialog {
   Q_OBJECT
  public:
-  OTIOPropertiesDialog(QList<SequencePtr> sequences, ProjectPtr active_project, QWidget* parent = nullptr);
+  OTIOPropertiesDialog(QList<SequencePtr> sequences, Project* active_project, QWidget* parent = nullptr);
 
  private:
   QTreeWidget* table_;
