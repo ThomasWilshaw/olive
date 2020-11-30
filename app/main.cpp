@@ -63,12 +63,10 @@ int main(int argc, char *argv[])
   QCoreApplication::setOrganizationName("olivevideoeditor.org");
   QCoreApplication::setOrganizationDomain("olivevideoeditor.org");
   QCoreApplication::setApplicationName("Olive");
+  QGuiApplication::setDesktopFileName("org.olivevideoeditor.Olive");
 
   QCoreApplication::setApplicationVersion(app_version);
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 7, 0))
-  QGuiApplication::setDesktopFileName("org.olivevideoeditor.Olive");
-#endif
 
   //
   // Parse command line arguments
@@ -134,11 +132,21 @@ int main(int argc, char *argv[])
 
   startup_params.set_startup_project(project_argument->GetSetting());
 
-  // Set OpenGL display profile (3.2 Core)
+  // Set OpenGL display profile
   QSurfaceFormat format;
+
+  // Tries to cover all bases. If drivers don't support 3.2, they should fallback to the closest
+  // alternative. Unfortunately Qt doesn't support 3.0-3.1 without DeprecatedFunctions, so we
+  // declare that too. We also force Qt to not use ANGLE because I've had a lot of problems with it
+  // so far.
+  //
+  // https://bugreports.qt.io/browse/QTBUG-46140
+  QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
   format.setVersion(3, 2);
-  format.setDepthBufferSize(24);
   format.setProfile(QSurfaceFormat::CoreProfile);
+  format.setOption(QSurfaceFormat::DeprecatedFunctions);
+
+  format.setDepthBufferSize(24);
   QSurfaceFormat::setDefaultFormat(format);
 
   // Enable application automatically using higher resolution images from icons

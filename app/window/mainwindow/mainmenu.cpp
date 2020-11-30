@@ -282,7 +282,7 @@ void MainMenu::ToolItemTriggered()
 
 void MainMenu::FileMenuAboutToShow()
 {
-  Project* active_project = Core::instance()->GetActiveProject().get();
+  Project* active_project = Core::instance()->GetActiveProject();
 
   file_project_properties_item_->setEnabled(active_project);
   file_save_item_->setEnabled(active_project);
@@ -665,7 +665,7 @@ void MainMenu::Retranslate()
   sequence_cache_in_to_out_item_->setText(tr("Cache Sequence In/Out"));
 
   // Window menu
-  window_menu_->setTitle("&Window");
+  window_menu_->setTitle(tr("&Window"));
   window_maximize_panel_item_->setText(tr("Maximize Panel"));
   window_lock_layout_item_->setText(tr("Lock Panels"));
   window_reset_layout_item_->setText(tr("Reset to Default Layout"));

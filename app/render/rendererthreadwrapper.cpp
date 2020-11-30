@@ -58,12 +58,14 @@ void RendererThreadWrapper::DestroyInternal()
 {
   if (thread_) {
     QMetaObject::invokeMethod(inner_, "DestroyInternal", Qt::BlockingQueuedConnection);
-    inner_ = nullptr;
 
     thread_->quit();
     thread_->wait();
     delete thread_;
     thread_ = nullptr;
+
+    // Destroy in main thread
+    inner_->PostDestroy();
   }
 }
 
@@ -148,13 +150,14 @@ void RendererThreadWrapper::DownloadFromTexture(Texture *texture, void *data, in
                             Q_ARG(int, linesize));
 }
 
-void RendererThreadWrapper::Blit(QVariant shader, ShaderJob job, Texture *destination, VideoParams destination_params)
+void RendererThreadWrapper::Blit(QVariant shader, ShaderJob job, Texture *destination, VideoParams destination_params, bool clear_destination)
 {
   QMetaObject::invokeMethod(inner_, "Blit", Qt::BlockingQueuedConnection,
                             Q_ARG(QVariant, shader),
                             OLIVE_NS_ARG(ShaderJob, job),
                             OLIVE_NS_ARG(Texture*, destination),
-                            OLIVE_NS_ARG(VideoParams, destination_params));
+                            OLIVE_NS_ARG(VideoParams, destination_params),
+                            Q_ARG(bool, clear_destination));
 }
 
 }

@@ -45,6 +45,34 @@ const QVector<GLfloat> blit_texcoords = {
   1.0f, 1.0f
 };
 
+class ErrorPrinter {
+public:
+  ErrorPrinter(const char* name, QOpenGLFunctions* f)
+  {
+    GLuint err = f->glGetError();
+    if (err > 0)
+      qDebug() << name << "entered with" << err;
+
+    name_ = name;
+    functions_ = f;
+  }
+
+  ~ErrorPrinter()
+  {
+    GLuint err = functions_->glGetError();
+    if (err > 0)
+      qDebug() << name_ << "exited with" << err;
+  }
+
+private:
+  const char* name_;
+
+  QOpenGLFunctions* functions_;
+
+};
+
+#define PRINT_GL_ERRORS ErrorPrinter __e(__FUNCTION__, functions_)
+
 OpenGLRenderer::OpenGLRenderer(QObject* parent) :
   Renderer(parent),
   context_(nullptr)
@@ -54,6 +82,7 @@ OpenGLRenderer::OpenGLRenderer(QObject* parent) :
 OpenGLRenderer::~OpenGLRenderer()
 {
   Destroy();
+  PostDestroy();
 }
 
 void OpenGLRenderer::Init(QOpenGLContext *existing_ctx)
@@ -86,6 +115,14 @@ bool OpenGLRenderer::Init()
   return true;
 }
 
+void OpenGLRenderer::PostDestroy()
+{
+  // Destroy surface if we created it
+  if (surface_.isValid()) {
+    surface_.destroy();
+  }
+}
+
 void OpenGLRenderer::PostInit()
 {
   // Make context current on that surface
@@ -114,11 +151,6 @@ void OpenGLRenderer::DestroyInternal()
       delete context_;
     }
     context_ = nullptr;
-
-    // Destroy surface if we created it
-    if (surface_.isValid()) {
-      surface_.destroy();
-    }
   }
 }
 
@@ -130,6 +162,7 @@ void OpenGLRenderer::ClearDestination(double r, double g, double b, double a)
 
 QVariant OpenGLRenderer::CreateNativeTexture2D(int width, int height, VideoParams::Format format, int channel_count, const void *data, int linesize)
 {
+
   GLuint texture;
   functions_->glGenTextures(1, &texture);
 
@@ -140,9 +173,13 @@ QVariant OpenGLRenderer::CreateNativeTexture2D(int width, int height, VideoParam
 
   functions_->glBindTexture(GL_TEXTURE_2D, texture);
 
-  functions_->glTexImage2D(GL_TEXTURE_2D, 0, GetInternalFormat(format, channel_count),
-                           width, height, 0, GetPixelFormat(channel_count),
-                           GetPixelType(format), data);
+  {
+
+    PRINT_GL_ERRORS;
+    functions_->glTexImage2D(GL_TEXTURE_2D, 0, GetInternalFormat(format, channel_count),
+                             width, height, 0, GetPixelFormat(channel_count),
+                             GetPixelType(format), data);
+  }
 
   functions_->glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
@@ -153,6 +190,8 @@ QVariant OpenGLRenderer::CreateNativeTexture2D(int width, int height, VideoParam
 
 QVariant OpenGLRenderer::CreateNativeTexture3D(int width, int height, int depth, VideoParams::Format format, int channel_count, const void *data, int linesize)
 {
+  PRINT_GL_ERRORS;
+
   GLuint texture;
   functions_->glGenTextures(1, &texture);
 
@@ -176,6 +215,8 @@ QVariant OpenGLRenderer::CreateNativeTexture3D(int width, int height, int depth,
 
 void OpenGLRenderer::AttachTextureAsDestination(Texture* texture)
 {
+  PRINT_GL_ERRORS;
+
   functions_->glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
   functions_->glFramebufferTexture2D(GL_FRAMEBUFFER,
                                      GL_COLOR_ATTACHMENT0,
@@ -197,14 +238,34 @@ void OpenGLRenderer::DestroyNativeTexture(QVariant texture)
 
 QVariant OpenGLRenderer::CreateNativeShader(ShaderCode code)
 {
+  PRINT_GL_ERRORS;
+
   QOpenGLShaderProgram* program = new QOpenGLShaderProgram(context_);
 
-  if (!program->addShaderFromSourceCode(QOpenGLShader::Vertex, code.vert_code())) {
+  QString vert_code = code.vert_code();
+  QString frag_code = code.frag_code();
+
+  QString shader_preamble;
+  if (QOpenGLContext::openGLModuleType() == QOpenGLContext::LibGLES) {
+    shader_preamble = QStringLiteral("#version 300 es\n"
+                                     "\n"
+                                     "precision highp int;\n"
+                                     "precision highp float;\n"
+                                     "\n");
+  } else {
+    shader_preamble = QStringLiteral("#version 150\n"
+                                     "\n");
+  }
+
+  vert_code.prepend(shader_preamble);
+  frag_code.prepend(shader_preamble);
+
+  if (!program->addShaderFromSourceCode(QOpenGLShader::Vertex, vert_code)) {
     qCritical() << "Failed to add vertex code to shader";
     goto error;
   }
 
-  if (!program->addShaderFromSourceCode(QOpenGLShader::Fragment, code.frag_code())) {
+  if (!program->addShaderFromSourceCode(QOpenGLShader::Fragment, frag_code)) {
     qCritical() << "Failed to add fragment code to shader";
     goto error;
   }
@@ -228,6 +289,8 @@ void OpenGLRenderer::DestroyNativeShader(QVariant shader)
 
 void OpenGLRenderer::UploadToTexture(Texture *texture, const void *data, int linesize)
 {
+  PRINT_GL_ERRORS;
+
   GLuint t = texture->id().value<GLuint>();
   const VideoParams& p = texture->params();
 
@@ -260,13 +323,16 @@ void OpenGLRenderer::DownloadFromTexture(Texture* texture, void *data, int lines
 
   functions_->glPixelStorei(GL_PACK_ROW_LENGTH, linesize);
 
-  functions_->glReadPixels(0,
-                           0,
-                           p.width(),
-                           p.height(),
-                           GetPixelFormat(p.channel_count()),
-                           GetPixelType(p.format()),
-                           data);
+  {
+    PRINT_GL_ERRORS;
+    functions_->glReadPixels(0,
+                             0,
+                             p.width(),
+                             p.height(),
+                             (QOpenGLContext::openGLModuleType() == QOpenGLContext::LibGLES) ? GL_RGBA : GetPixelFormat(p.channel_count()),
+                             GetPixelType(p.format()),
+                             data);
+  }
 
   functions_->glPixelStorei(GL_PACK_ROW_LENGTH, 0);
 
@@ -280,7 +346,7 @@ struct TextureToBind {
   Texture::Interpolation interpolation;
 };
 
-void OpenGLRenderer::Blit(QVariant s, ShaderJob job, Texture *destination, VideoParams destination_params)
+void OpenGLRenderer::Blit(QVariant s, ShaderJob job, Texture *destination, VideoParams destination_params, bool clear_destination)
 {
   // If this node is iterative, we'll pick up which input here
   QString iterative_name;
@@ -356,34 +422,14 @@ void OpenGLRenderer::Blit(QVariant s, ShaderJob job, Texture *destination, Video
         iterative_name = it.key();
       }
 
-      GLuint tex_id = texture ? texture->id().value<GLuint>() : 0;
       textures_to_bind.append({texture, job.GetInterpolation(it.key())});
 
       // Set enable flag if shader wants it
+      GLuint tex_id = texture ? texture->id().value<GLuint>() : 0;
       int enable_param_location = shader->uniformLocation(QStringLiteral("%1_enabled").arg(it.key()));
       if (enable_param_location > -1) {
         shader->setUniformValue(enable_param_location,
                                 tex_id > 0);
-      }
-
-      if (tex_id > 0) {
-        // Set texture resolution if shader wants it
-        int res_param_location = shader->uniformLocation(QStringLiteral("%1_resolution").arg(it.key()));
-        if (res_param_location > -1) {
-          int virtual_width = texture->params().width();
-
-          // Adjust virtual width by pixel aspect if necessary
-          if (texture->params().pixel_aspect_ratio() != 1
-              || destination_params.pixel_aspect_ratio() != 1) {
-            double relative_pixel_aspect = texture->params().pixel_aspect_ratio().toDouble() / destination_params.pixel_aspect_ratio().toDouble();
-
-            virtual_width = qRound(static_cast<double>(virtual_width) * relative_pixel_aspect);
-          }
-
-          shader->setUniformValue(res_param_location,
-                                  virtual_width,
-                                  static_cast<GLfloat>(texture->height() * texture->divider()));
-        }
       }
       break;
     }
@@ -415,16 +461,11 @@ void OpenGLRenderer::Blit(QVariant s, ShaderJob job, Texture *destination, Video
 
     functions_->glActiveTexture(GL_TEXTURE0 + i);
 
-    GLenum target = (texture->type() == Texture::k3D) ? GL_TEXTURE_3D : GL_TEXTURE_2D;
+    GLenum target = (texture && texture->type() == Texture::k3D) ? GL_TEXTURE_3D : GL_TEXTURE_2D;
     functions_->glBindTexture(target, tex_id);
 
     PrepareInputTexture(target, t.interpolation);
   }
-
-  // Set ove_resolution to the destination to the "logical" resolution of the destination
-  shader->setUniformValue("ove_resolution",
-                          static_cast<GLfloat>(destination_params.width()),
-                          static_cast<GLfloat>(destination_params.height()));
 
   // Ensure matrix is set, at least to identity
   shader->setUniformValue("ove_mvpmat",
@@ -504,8 +545,10 @@ void OpenGLRenderer::Blit(QVariant s, ShaderJob job, Texture *destination, Video
         DetachTextureAsDestination();
       }
 
-      // Clear the destination, whatever it is
-      ClearDestination();
+      // Clear the destination if the caller requested it
+      if (clear_destination) {
+        ClearDestination();
+      }
     } else {
       // Always draw to output_tex, which gets swapped with input_tex every iteration
       AttachTextureAsDestination(output_tex.get());
@@ -525,7 +568,10 @@ void OpenGLRenderer::Blit(QVariant s, ShaderJob job, Texture *destination, Video
     std::swap(output_tex, input_tex);
 
     // Blit this texture through this shader
-    functions_->glDrawArrays(GL_TRIANGLES, 0, blit_vertices.size() / 3);
+    {
+      PRINT_GL_ERRORS;
+      functions_->glDrawArrays(GL_TRIANGLES, 0, blit_vertices.size() / 3);
+    }
   }
 
   if (destination) {
@@ -535,7 +581,8 @@ void OpenGLRenderer::Blit(QVariant s, ShaderJob job, Texture *destination, Video
 
   // Release any textures we bound before
   for (int i=textures_to_bind.size()-1; i>=0; i--) {
-    GLenum target = (textures_to_bind.at(i).texture->type() == Texture::k3D) ? GL_TEXTURE_3D : GL_TEXTURE_2D;
+    TexturePtr texture = textures_to_bind.at(i).texture;
+    GLenum target = (texture && texture->type() == Texture::k3D) ? GL_TEXTURE_3D : GL_TEXTURE_2D;
     functions_->glActiveTexture(GL_TEXTURE0 + i);
     functions_->glBindTexture(target, 0);
   }

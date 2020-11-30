@@ -165,6 +165,7 @@ TrackRippleRemoveAreaCommand::TrackRippleRemoveAreaCommand(TrackOutput *track, r
   in_(in),
   out_(out),
   splice_(false),
+  splice_split_command_(nullptr),
   trim_out_(nullptr),
   trim_in_(nullptr),
   insert_(nullptr)
@@ -209,29 +210,38 @@ void TrackRippleRemoveAreaCommand::redo_internal()
   // If we picked up a block to splice
   if (splice_) {
 
-    // Split the block here
-    splice_split_command_ = new QUndoCommand();
+    if (trim_out_->type() == Block::kGap && !insert_) {
 
-    if (Config::Current()[QStringLiteral("SplitClipsCopyNodes")].toBool()) {
-      QVector<Node*> nodes_to_clone;
-      nodes_to_clone.append(trim_out_);
-      nodes_to_clone.append(trim_out_->GetDependencies());
-      QVector<Node*> duplicated = Node::CopyDependencyGraph(nodes_to_clone, splice_split_command_);
-      trim_in_ = static_cast<Block*>(duplicated.first());
+      // Gaps shouldn't be split, just trim the difference
+      trim_out_->set_length_and_media_out(trim_out_->length() - (out_ - in_));
+
     } else {
-      trim_in_ = static_cast<Block*>(trim_out_->copy());
-      new NodeAddCommand(static_cast<NodeGraph*>(track_->parent()), trim_in_, splice_split_command_);
-      new NodeCopyInputsCommand(trim_out_, trim_in_, true, splice_split_command_);
+
+      // Split the block here
+      splice_split_command_ = new QUndoCommand();
+
+      if (Config::Current()[QStringLiteral("SplitClipsCopyNodes")].toBool()) {
+        QVector<Node*> nodes_to_clone;
+        nodes_to_clone.append(trim_out_);
+        nodes_to_clone.append(trim_out_->GetDependencies());
+        QVector<Node*> duplicated = Node::CopyDependencyGraph(nodes_to_clone, splice_split_command_);
+        trim_in_ = static_cast<Block*>(duplicated.first());
+      } else {
+        trim_in_ = static_cast<Block*>(trim_out_->copy());
+        new NodeAddCommand(static_cast<NodeGraph*>(track_->parent()), trim_in_, splice_split_command_);
+        new NodeCopyInputsCommand(trim_out_, trim_in_, true, splice_split_command_);
+      }
+
+      splice_split_command_->redo();
+
+      trim_out_old_length_ = trim_out_->length();
+      trim_out_->set_length_and_media_out(in_ - trim_out_->in());
+
+      trim_in_->set_length_and_media_in(trim_out_old_length_ - (out_ - trim_out_->in()));
+
+      track_->InsertBlockAfter(trim_in_, trim_out_);
+
     }
-
-    splice_split_command_->redo();
-
-    trim_out_old_length_ = trim_out_->length();
-    trim_out_->set_length_and_media_out(in_ - trim_out_->in());
-
-    trim_in_->set_length_and_media_in(trim_out_old_length_ - (out_ - trim_out_->in()));
-
-    track_->InsertBlockAfter(trim_in_, trim_out_);
 
   } else {
 
@@ -300,12 +310,20 @@ void TrackRippleRemoveAreaCommand::undo_internal()
 
   if (splice_) {
 
-    // trim_in_ is our copy and trim_out_ is our original
-    track_->RippleRemoveBlock(trim_in_);
-    trim_out_->set_length_and_media_out(trim_out_old_length_);
+    if (trim_out_->type() == Block::kGap && !insert_) {
 
-    splice_split_command_->undo();
-    delete splice_split_command_;
+      // Just restore the length
+      trim_out_->set_length_and_media_out(trim_out_->length() + (out_ - in_));
+
+    } else {
+
+      // trim_in_ is our copy and trim_out_ is our original
+      track_->RippleRemoveBlock(trim_in_);
+      trim_out_->set_length_and_media_out(trim_out_old_length_);
+
+      splice_split_command_->undo();
+
+    }
 
   } else {
 
@@ -344,6 +362,11 @@ void TrackRippleRemoveAreaCommand::undo_internal()
 
   track_->Node::InvalidateCache(TimeRange(in_, insert_ ? out_ : RATIONAL_MAX),
                                 track_->block_input(), track_->block_input());
+
+  if (splice_split_command_) {
+    delete splice_split_command_;
+    splice_split_command_ = nullptr;
+  }
 }
 
 TrackPlaceBlockCommand::TrackPlaceBlockCommand(TrackList *timeline, int track, Block *block, rational in, QUndoCommand *parent) :
@@ -1573,18 +1596,21 @@ void TrackListInsertGaps::redo_internal()
   }
 
   QVector<Block*> blocks_to_split;
-  QList<Block*> blocks_to_append_gap_to;
+  QVector<Block*> blocks_to_append_gap_to;
 
   foreach (TrackOutput* track, working_tracks_) {
     foreach (Block* b, track->Blocks()) {
       if (b->type() == Block::kGap && b->in() <= point_ && b->out() >= point_) {
+        // Found a gap at the location
         gaps_to_extend_.append(b);
+        break;
       } else if (b->type() == Block::kClip && b->out() >= point_) {
         if (b->out() > point_) {
           blocks_to_split.append(b);
         }
 
         blocks_to_append_gap_to.append(b);
+        break;
       }
     }
   }

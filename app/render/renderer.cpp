@@ -56,14 +56,14 @@ TexturePtr Renderer::CreateTexture(const VideoParams &params, const void *data, 
   return CreateTexture(params, Texture::k2D, data, linesize);
 }
 
-void Renderer::BlitColorManaged(ColorProcessorPtr color_processor, TexturePtr source, bool source_is_premultiplied, Texture *destination, const QMatrix4x4 &matrix)
+void Renderer::BlitColorManaged(ColorProcessorPtr color_processor, TexturePtr source, bool source_is_premultiplied, Texture *destination, bool clear_destination, const QMatrix4x4 &matrix)
 {
-  BlitColorManagedInternal(color_processor, source, source_is_premultiplied, destination, destination->params(), matrix);
+  BlitColorManagedInternal(color_processor, source, source_is_premultiplied, destination, destination->params(), clear_destination, matrix);
 }
 
-void Renderer::BlitColorManaged(ColorProcessorPtr color_processor, TexturePtr source, bool source_is_premultiplied, VideoParams params, const QMatrix4x4& matrix)
+void Renderer::BlitColorManaged(ColorProcessorPtr color_processor, TexturePtr source, bool source_is_premultiplied, VideoParams params, bool clear_destination, const QMatrix4x4& matrix)
 {
-  BlitColorManagedInternal(color_processor, source, source_is_premultiplied, nullptr, params, matrix);
+  BlitColorManagedInternal(color_processor, source, source_is_premultiplied, nullptr, params, clear_destination, matrix);
 }
 
 void Renderer::Destroy()
@@ -75,6 +75,8 @@ void Renderer::Destroy()
 
 bool Renderer::GetColorContext(ColorProcessorPtr color_processor, Renderer::ColorContext *ctx)
 {
+  QMutexLocker locker(&color_cache_mutex_);
+
   ColorContext& color_ctx = *ctx;
 
   if (color_cache_.contains(color_processor->id())) {
@@ -92,14 +94,7 @@ bool Renderer::GetColorContext(ColorProcessorPtr color_processor, Renderer::Colo
     color_processor->GetProcessor()->getDefaultGPUProcessor()->extractGpuShaderInfo(shader_desc);
 
     QString shader_frag;
-    shader_frag.append(QStringLiteral("#version 150\n"
-                                      "\n"
-                                      "#ifdef GL_ES\n"
-                                      "precision highp int;\n"
-                                      "precision highp float;\n"
-                                      "#endif\n"
-                                      "\n"
-                                      "// Main texture input\n"
+    shader_frag.append(QStringLiteral("// Main texture input\n"
                                       "uniform sampler2D ove_maintex;\n"
                                       "uniform int ove_maintex_alpha;\n"
                                       "\n"
@@ -232,7 +227,7 @@ bool Renderer::GetColorContext(ColorProcessorPtr color_processor, Renderer::Colo
 
 void Renderer::BlitColorManagedInternal(ColorProcessorPtr color_processor, TexturePtr source,
                                         bool source_is_premultiplied, Texture *destination,
-                                        VideoParams params, const QMatrix4x4& matrix)
+                                        VideoParams params, bool clear_destination, const QMatrix4x4& matrix)
 {
   ColorContext color_ctx;
   if (!GetColorContext(color_processor, &color_ctx)) {
@@ -269,9 +264,9 @@ void Renderer::BlitColorManagedInternal(ColorProcessorPtr color_processor, Textu
   }
 
   if (destination) {
-    BlitToTexture(color_ctx.compiled_shader, job, destination);
+    BlitToTexture(color_ctx.compiled_shader, job, destination, clear_destination);
   } else {
-    Blit(color_ctx.compiled_shader, job, params);
+    Blit(color_ctx.compiled_shader, job, params, clear_destination);
   }
 }
 

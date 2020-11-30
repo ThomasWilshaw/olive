@@ -18,43 +18,19 @@
 
 ***/
 
-#ifndef AVFRAMEPTR_H
-#define AVFRAMEPTR_H
+#ifndef RECORDTIMELINETOOL_H
+#define RECORDTIMELINETOOL_H
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-}
-
-#include <memory>
-#include <QDateTime>
-
-#include "common/define.h"
+#include "beam.h"
 
 namespace olive {
 
-class AVFrameWrapper {
+class RecordTool : public BeamTool
+{
 public:
-  AVFrameWrapper() {
-    frame_ = av_frame_alloc();
-  }
-
-  virtual ~AVFrameWrapper() {
-    av_frame_free(&frame_);
-  }
-
-  DISABLE_COPY_MOVE(AVFrameWrapper)
-
-  inline AVFrame* frame() const {
-    return frame_;
-  }
-
-private:
-  AVFrame* frame_;
-
+  RecordTool(TimelineWidget* parent);
 };
-
-using AVFramePtr = std::shared_ptr<AVFrameWrapper>;
 
 }
 
-#endif // AVFRAMEPTR_H
+#endif // RECORDTOOL_H

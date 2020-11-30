@@ -20,6 +20,7 @@
 
 #include "renderprocessor.h"
 
+#include <QOpenGLContext>
 #include <QVector2D>
 #include <QVector3D>
 #include <QVector4D>
@@ -45,6 +46,10 @@ void RenderProcessor::Run()
   RenderManager::TicketType type = ticket_->property("type").value<RenderManager::TicketType>();
 
   ticket_->Start();
+
+  if (ticket_->WasCancelled()) {
+    return;
+  }
 
   switch (type) {
   case RenderManager::kTypeVideo:
@@ -72,7 +77,11 @@ void RenderProcessor::Run()
       frame_params.set_format(frame_format);
     }
 
-    if (texture) {
+    if (RenderManager::instance()->backend() == RenderManager::kOpenGL
+        && QOpenGLContext::openGLModuleType() == QOpenGLContext::LibGLES) {
+      // HACK: From what I can tell, ANGLE only supports texture reading to RGBA
+      frame_params.set_channel_count(VideoParams::kRGBAChannelCount);
+    } else if (texture) {
       frame_params.set_channel_count(texture->channel_count());
     }
 
@@ -99,7 +108,7 @@ void RenderProcessor::Run()
 
         if (output_color_transform) {
           // Yes color transform, blit color managed
-          render_ctx_->BlitColorManaged(output_color_transform, texture, true, blit_tex.get(), matrix);
+          render_ctx_->BlitColorManaged(output_color_transform, texture, true, blit_tex.get(), true, matrix);
         } else {
           // No color transform, just blit
           ShaderJob job;
@@ -232,7 +241,7 @@ NodeValueTable RenderProcessor::GenerateBlockTable(const TrackOutput *track, con
       NodeValueTable::Merge({merged_table, table});
     }
 
-    if (ticket_->property("waveforms").toBool()) {
+    if (ticket_->property("enablewaveforms").toBool()) {
       // Generate a visual waveform and send it back to the main thread
       AudioVisualWaveform visual_waveform;
       visual_waveform.set_channel_count(audio_params.channel_count());
@@ -265,12 +274,20 @@ QVariant RenderProcessor::ProcessVideoFootage(StreamPtr stream, const rational &
 
   ColorManager* color_manager = Node::ValueToPtr<ColorManager>(ticket_->property("colormanager"));
 
+  // See if we can make this divider larger (i.e. if the fooage is smaller)
+  int footage_divider = video_params.divider();
+  while (footage_divider > 1
+         && VideoParams::GetScaledDimension(video_stream->width(), footage_divider-1) < video_params.effective_width()
+         && VideoParams::GetScaledDimension(video_stream->height(), footage_divider-1) < video_params.effective_height()) {
+    footage_divider--;
+  }
+
   StillImageCache::EntryPtr want_entry = std::make_shared<StillImageCache::Entry>(
         nullptr,
         stream,
         ColorProcessor::GenerateID(color_manager, video_stream->colorspace(), color_manager->GetReferenceColorSpace()),
         video_stream->premultiplied_alpha(),
-        video_params.divider(),
+        footage_divider,
         (video_stream->video_type() == VideoStream::kVideoTypeStill) ? 0 : input_time,
         true);
 
@@ -312,7 +329,7 @@ QVariant RenderProcessor::ProcessVideoFootage(StreamPtr stream, const rational &
 
     if (decoder) {
       FramePtr frame = decoder->RetrieveVideo(input_time,
-                                              video_params.divider());
+                                              footage_divider);
 
       if (frame) {
         // Return a texture from the derived class
@@ -325,8 +342,6 @@ QVariant RenderProcessor::ProcessVideoFootage(StreamPtr stream, const rational &
         VideoParams managed_params = frame->video_params();
         managed_params.set_format(video_params.format());
         value = render_ctx_->CreateTexture(managed_params);
-
-        //qDebug() << "FIXME: Accessing video_stream->colorspace() and video_stream->premultiplied_alpha() may cause race conditions";
 
         ColorProcessorPtr processor = ColorProcessor::Create(color_manager,
                                                              video_stream->colorspace(),
@@ -510,6 +525,14 @@ QVariant RenderProcessor::GetCachedFrame(const Node *node, const rational &time)
   }
 
   return QVariant();
+}
+
+QVector2D RenderProcessor::GenerateResolution() const
+{
+  // Set resolution to the destination to the "logical" resolution of the destination
+  const VideoParams& video_params = ticket_->property("vparam").value<VideoParams>();
+  return QVector2D(video_params.width() * video_params.pixel_aspect_ratio().toDouble(),
+                   video_params.height());
 }
 
 }

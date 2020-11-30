@@ -26,7 +26,6 @@
 #include <QStyleOptionGraphicsItem>
 
 #include "common/bezier.h"
-#include "common/clamp.h"
 #include "common/lerp.h"
 #include "nodeview.h"
 #include "nodeviewscene.h"

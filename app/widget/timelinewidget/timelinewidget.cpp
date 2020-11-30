@@ -35,6 +35,7 @@
 #include "tool/edit.h"
 #include "tool/pointer.h"
 #include "tool/razor.h"
+#include "tool/record.h"
 #include "tool/ripple.h"
 #include "tool/rolling.h"
 #include "tool/slide.h"
@@ -96,7 +97,7 @@ TimelineWidget::TimelineWidget(QWidget *parent) :
   tools_.replace(olive::Tool::kSlide, new SlideTool(this));
   tools_.replace(olive::Tool::kZoom, new ZoomTool(this));
   tools_.replace(olive::Tool::kTransition, new TransitionTool(this));
-  //tools_.replace(olive::Tool::kRecord, new PointerTool(this));  FIXME: Implement
+  tools_.replace(olive::Tool::kRecord, new RecordTool(this));
   tools_.replace(olive::Tool::kAdd, new AddTool(this));
 
   import_tool_ = new ImportTool(this);
@@ -131,7 +132,6 @@ TimelineWidget::TimelineWidget(QWidget *parent) :
     connect(view, &TimelineView::customContextMenuRequested, this, &TimelineWidget::ShowContextMenu);
     connect(scrollbar(), &QScrollBar::valueChanged, view->horizontalScrollBar(), &QScrollBar::setValue);
     connect(view->horizontalScrollBar(), &QScrollBar::valueChanged, scrollbar(), &QScrollBar::setValue);
-    connect(view, &TimelineView::RequestCenterScrollOnPlayhead, this, &TimelineWidget::CenterScrollOnPlayhead);
 
     connect(view, &TimelineView::MousePressed, this, &TimelineWidget::ViewMousePressed);
     connect(view, &TimelineView::MouseMoved, this, &TimelineWidget::ViewMouseMoved);
@@ -278,6 +278,8 @@ void TimelineWidget::DisconnectNodeInternal(ViewerOutput *n)
   disconnect(n, &ViewerOutput::TimebaseChanged, this, &TimelineWidget::SetTimebase);
   disconnect(n, &ViewerOutput::TrackHeightChanged, this, &TimelineWidget::TrackHeightChanged);
 
+  DeselectAll();
+
   foreach (TrackOutput* track, n->GetTracks()) {
     RemoveTrack(track);
   }
@@ -297,7 +299,7 @@ void TimelineWidget::DisconnectNodeInternal(ViewerOutput *n)
 void TimelineWidget::CopyNodesToClipboardInternal(QXmlStreamWriter *writer, void* userdata)
 {
   // Cache the earliest in point so all copied clips have a "relative" in point that can be pasted anywhere
-  QList<TimelineViewBlockItem*>& selected = *static_cast<QList<TimelineViewBlockItem*>*>(userdata);
+  QVector<TimelineViewBlockItem*>& selected = *static_cast<QVector<TimelineViewBlockItem*>*>(userdata);
   rational earliest_in = RATIONAL_MAX;
 
   foreach (TimelineViewBlockItem* item, selected) {
@@ -327,7 +329,7 @@ void TimelineWidget::CopyNodesToClipboardInternal(QXmlStreamWriter *writer, void
 
 void TimelineWidget::PasteNodesFromClipboardInternal(QXmlStreamReader *reader, XMLNodeData& xml_node_data, void *userdata)
 {
-  QList<BlockPasteData>& paste_data = *static_cast<QList<BlockPasteData>*>(userdata);
+  QVector<BlockPasteData>& paste_data = *static_cast<QVector<BlockPasteData>*>(userdata);
 
   while (XMLReadNextStartElement(reader)) {
     if (reader->name() == QStringLiteral("block")) {
@@ -350,14 +352,6 @@ void TimelineWidget::PasteNodesFromClipboardInternal(QXmlStreamReader *reader, X
       reader->skipCurrentElement();
     }
   }
-}
-
-rational TimelineWidget::GetToolTipTimebase() const
-{
-  if (GetConnectedNode() && use_audio_time_units_) {
-    return GetConnectedNode()->audio_params().time_base();
-  }
-  return timebase();
 }
 
 void TimelineWidget::SelectAll()
@@ -599,11 +593,11 @@ void TimelineWidget::ToggleLinksOnSelected()
     blocks.append(item->block());
   }
 
-  if (link) {
-    Core::instance()->undo_stack()->push(new BlockLinkManyCommand(blocks, true));
-  } else {
-    Core::instance()->undo_stack()->push(new BlockLinkManyCommand(blocks, false));
+  if (blocks.isEmpty()) {
+    return;
   }
+
+  Core::instance()->undo_stack()->push(new BlockLinkManyCommand(blocks, link));
 }
 
 void TimelineWidget::CopySelected(bool cut)
@@ -813,11 +807,13 @@ void TimelineWidget::ViewMousePressed(TimelineViewMouseEvent *event)
 
   if (GetConnectedNode() && active_tool_ != nullptr) {
     active_tool_->MousePress(event);
+    UpdateViewports();
   }
 
   if (event->GetButton() != Qt::LeftButton) {
     // Suspend tool immediately if the cursor isn't the primary button
     active_tool_->MouseRelease(event);
+    UpdateViewports();
     active_tool_ = nullptr;
   }
 }
@@ -827,12 +823,14 @@ void TimelineWidget::ViewMouseMoved(TimelineViewMouseEvent *event)
   if (GetConnectedNode()) {
     if (active_tool_) {
       active_tool_->MouseMove(event);
+      UpdateViewports();
     } else {
       // Mouse is not down, attempt a hover event
       TimelineTool* hover_tool = GetActiveTool();
 
       if (hover_tool) {
         hover_tool->HoverMove(event);
+        UpdateViewports();
       }
     }
   }
@@ -842,6 +840,7 @@ void TimelineWidget::ViewMouseReleased(TimelineViewMouseEvent *event)
 {
   if (GetConnectedNode() && active_tool_ != nullptr) {
     active_tool_->MouseRelease(event);
+    UpdateViewports();
     active_tool_ = nullptr;
   }
 }
@@ -850,27 +849,32 @@ void TimelineWidget::ViewMouseDoubleClicked(TimelineViewMouseEvent *event)
 {
   if (GetConnectedNode()) {
     GetActiveTool()->MouseDoubleClick(event);
+    UpdateViewports();
   }
 }
 
 void TimelineWidget::ViewDragEntered(TimelineViewMouseEvent *event)
 {
   import_tool_->DragEnter(event);
+  UpdateViewports();
 }
 
 void TimelineWidget::ViewDragMoved(TimelineViewMouseEvent *event)
 {
   import_tool_->DragMove(event);
+  UpdateViewports();
 }
 
 void TimelineWidget::ViewDragLeft(QDragLeaveEvent *event)
 {
   import_tool_->DragLeave(event);
+  UpdateViewports();
 }
 
 void TimelineWidget::ViewDragDropped(TimelineViewMouseEvent *event)
 {
   import_tool_->DragDrop(event);
+  UpdateViewports();
 }
 
 void TimelineWidget::AddBlock(Block *block, TrackReference track)
@@ -1200,6 +1204,11 @@ TimelineView *TimelineWidget::GetFirstTimelineView()
   return views_.first()->view();
 }
 
+rational TimelineWidget::GetTimebaseForTrackType(Timeline::TrackType type)
+{
+  return views_.at(type)->view()->timebase();
+}
+
 const QRect& TimelineWidget::GetRubberBandGeometry() const
 {
   return rubberband_.geometry();
@@ -1418,16 +1427,19 @@ void TimelineWidget::RestoreSplitterState(const QByteArray &state)
   view_splitter_->restoreState(state);
 }
 
-void TimelineWidget::StartRubberBandSelect(bool enable_selecting, bool select_links)
+void TimelineWidget::StartRubberBandSelect(const QPoint &global_cursor_start)
 {
-  drag_origin_ = QCursor::pos();
+  drag_origin_ = global_cursor_start;
+
+  // Start rubberband at origin
+  QPoint local_origin = mapFromGlobal(drag_origin_);
+  rubberband_.setGeometry(QRect(local_origin.x(), local_origin.y(), 0, 0));
+
   rubberband_.show();
 
   // We don't touch any blocks that are already selected. If you want these to be deselected by
   // default, call DeselectAll() before calling StartRubberBandSelect()
   rubberband_old_selections_ = selections_;
-
-  MoveRubberBandSelect(enable_selecting, select_links);
 }
 
 void TimelineWidget::MoveRubberBandSelect(bool enable_selecting, bool select_links)

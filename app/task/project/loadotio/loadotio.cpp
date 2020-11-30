@@ -55,7 +55,7 @@ bool LoadOTIOTask::Run()
     return false;
   }
 
-  project_ = std::make_shared<Project>();
+  project_ = new Project();
   project_->set_filename(GetFilename());
 
   std::vector<OTIO::Timeline*> timelines;
@@ -215,7 +215,7 @@ bool LoadOTIOTask::Run()
                 probed_item->set_project(project_.get());
                 probed_item->set_timestamp(file_info.lastModified().toMSecsSinceEpoch());
               }
-              
+
               imported_footage.insert(footage_url, probed_item);
               project_->root()->add_child(probed_item);
             }

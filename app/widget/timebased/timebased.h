@@ -25,7 +25,7 @@
 
 #include "node/output/viewer/viewer.h"
 #include "timeline/timelinecommon.h"
-#include "widget/resizablescrollbar/resizablescrollbar.h"
+#include "widget/resizablescrollbar/resizabletimelinescrollbar.h"
 #include "widget/timelinewidget/timelinescaledobject.h"
 #include "widget/timelinewidget/view/timelineview.h"
 #include "widget/timeruler/timeruler.h"
@@ -53,6 +53,8 @@ public:
   void SetScaleAndCenterOnPlayhead(const double& scale);
 
   TimeRuler* ruler() const;
+
+  virtual bool eventFilter(QObject* object, QEvent* event) override;
 
 public slots:
   void SetTimestamp(int64_t timestamp);
@@ -95,7 +97,7 @@ protected slots:
   void SetTimeAndSignal(const int64_t& t);
 
 protected:
-  ResizableScrollBar* scrollbar() const;
+  ResizableTimelineScrollBar* scrollbar() const;
 
   virtual void TimebaseChangedEvent(const rational&) override;
 
@@ -120,6 +122,8 @@ protected:
   TimelinePoints* GetConnectedTimelinePoints() const;
 
   void ConnectTimelineView(TimelineViewBase* base);
+
+  void PassWheelEventsToScrollBar(QObject* object);
 
 protected slots:
   /**
@@ -184,7 +188,7 @@ private:
 
   TimeRuler* ruler_;
 
-  ResizableScrollBar* scrollbar_;
+  ResizableTimelineScrollBar* scrollbar_;
 
   bool auto_max_scrollbar_;
 
@@ -199,10 +203,20 @@ private:
 
   bool auto_set_timebase_;
 
+  QVector<QObject*> wheel_passthrough_objects_;
+
 private slots:
   void UpdateMaximumScroll();
 
   void ScrollBarResized(const double& multiplier);
+
+  /**
+   * @brief Slot to handle page scrolling of the playhead
+   *
+   * If the playhead is outside the current scroll bounds, this function will scroll to where it is. Otherwise it will
+   * do nothing.
+   */
+  void PageScrollToPlayhead();
 
 };
 

@@ -21,6 +21,7 @@
 #include "node.h"
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <QDebug>
 #include <QFile>
 
@@ -92,6 +93,7 @@ void Node::Load(QXmlStreamReader *reader, XMLNodeData& xml_node_data, const QAto
 
       if (!param) {
         qDebug() << "No parameter in" << id() << "with parameter" << param_id;
+        reader->skipCurrentElement();
         continue;
       }
 
@@ -372,16 +374,16 @@ bool Node::HasGizmos() const
   return false;
 }
 
-void Node::DrawGizmos(NodeValueDatabase &, QPainter *, const QVector2D &, const QSize &) const
+void Node::DrawGizmos(NodeValueDatabase &, QPainter *)
 {
 }
 
-bool Node::GizmoPress(NodeValueDatabase &, const QPointF &, const QVector2D &, const QSize &)
+bool Node::GizmoPress(NodeValueDatabase &, const QPointF &)
 {
   return false;
 }
 
-void Node::GizmoMove(const QPointF &, const QVector2D &, const rational &)
+void Node::GizmoMove(const QPointF &, const rational&)
 {
 }
 
@@ -767,6 +769,8 @@ QString Node::GetCategoryName(const CategoryID &c)
     return tr("Output");
   case kCategoryGeneral:
     return tr("General");
+  case kCategoryDistort:
+    return tr("Distort");
   case kCategoryMath:
     return tr("Math");
   case kCategoryColor:
@@ -931,6 +935,36 @@ void Node::InputChanged(const TimeRange& range)
 void Node::InputConnectionChanged(NodeEdgePtr edge)
 {
   InvalidateCache(TimeRange(RATIONAL_MIN, RATIONAL_MAX), edge->input(), edge->input());
+}
+
+QRectF Node::CreateGizmoHandleRect(const QPointF &pt, int radius)
+{
+  return QRectF(pt.x() - radius,
+                pt.y() - radius,
+                2*radius,
+                2*radius);
+}
+
+double Node::GetGizmoHandleRadius(const QTransform &transform)
+{
+  double raw_value = QFontMetrics(qApp->font()).height() * 0.25;
+
+  raw_value /= transform.m11();
+
+  return raw_value;
+}
+
+void Node::DrawAndExpandGizmoHandles(QPainter *p, int handle_radius, QRectF *rects, int count)
+{
+  for (int i=0; i<count; i++) {
+    QRectF& r = rects[i];
+
+    // Draw rect on screen
+    p->drawRect(r);
+
+    // Extend rect so it's easier to drag with handle
+    r.adjust(-handle_radius, -handle_radius, handle_radius, handle_radius);
+  }
 }
 
 }

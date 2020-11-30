@@ -74,6 +74,7 @@ public:
     kCategoryTimeline,
     kCategoryChannels,
     kCategoryTransition,
+    kCategoryDistort,
 
     kCategoryCount
   };
@@ -419,10 +420,10 @@ public:
 
   virtual bool HasGizmos() const;
 
-  virtual void DrawGizmos(NodeValueDatabase& db, QPainter* p, const QVector2D &scale, const QSize& viewport) const;
+  virtual void DrawGizmos(NodeValueDatabase& db, QPainter* p);
 
-  virtual bool GizmoPress(NodeValueDatabase& db, const QPointF& p, const QVector2D &scale, const QSize& viewport);
-  virtual void GizmoMove(const QPointF& p, const QVector2D &scale, const rational &time);
+  virtual bool GizmoPress(NodeValueDatabase& db, const QPointF& p);
+  virtual void GizmoMove(const QPointF& p, const rational &time);
   virtual void GizmoRelease();
 
   const QString& GetLabel() const;
@@ -442,6 +443,24 @@ protected:
   virtual void SaveInternal(QXmlStreamWriter* writer) const;
 
   virtual QVector<NodeInput*> GetInputsToHash() const;
+
+  enum GizmoScaleHandles {
+    kGizmoScaleTopLeft,
+    kGizmoScaleTopCenter,
+    kGizmoScaleTopRight,
+    kGizmoScaleBottomLeft,
+    kGizmoScaleBottomCenter,
+    kGizmoScaleBottomRight,
+    kGizmoScaleCenterLeft,
+    kGizmoScaleCenterRight,
+    kGizmoScaleCount,
+  };
+
+  static QRectF CreateGizmoHandleRect(const QPointF& pt, int radius);
+
+  static double GetGizmoHandleRadius(const QTransform& transform);
+
+  static void DrawAndExpandGizmoHandles(QPainter* p, int handle_radius, QRectF* rects, int count);
 
 protected slots:
   void InputChanged(const olive::TimeRange &range);

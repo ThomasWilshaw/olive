@@ -30,6 +30,7 @@
 #include "core.h"
 #include "dialog/sequence/sequence.h"
 #include "node/audio/volume/volume.h"
+#include "node/distort/transform/transformdistortnode.h"
 #include "node/generator/matrix/matrix.h"
 #include "node/input/media/media.h"
 #include "node/math/math/math.h"
@@ -148,9 +149,10 @@ void ImportTool::DragMove(TimelineViewMouseEvent *event)
       }
 
       // Generate tooltip (showing earliest in point of imported clip)
-      int64_t earliest_timestamp = Timecode::time_to_timestamp(earliest_ghost, parent()->GetToolTipTimebase());
+      rational tooltip_timebase = parent()->GetTimebaseForTrackType(event->GetTrack().type());
+      int64_t earliest_timestamp = Timecode::time_to_timestamp(earliest_ghost, tooltip_timebase);
       QString tooltip_text = Timecode::timestamp_to_timecode(earliest_timestamp,
-                                                             parent()->GetToolTipTimebase(),
+                                                             tooltip_timebase,
                                                              Core::instance()->GetTimecodeDisplay());
 
       // Force tooltip to update (otherwise the tooltip won't move as written in the documentation, and could get in the way
@@ -270,6 +272,12 @@ void ImportTool::FootageToGhosts(rational ghost_start, const QList<DraggedFootag
       footage_duration = Config::Current()["DefaultStillLength"].value<rational>();
     }
 
+    // Snap footage duration to timebase
+    rational snap_mvmt = SnapMovementToTimebase(footage_duration, 0, dest_tb);
+    if (!snap_mvmt.isNull()) {
+      footage_duration += snap_mvmt;
+    }
+
     foreach (TimelineViewGhostItem* ghost, footage_ghosts) {
       ghost->SetIn(ghost_start);
       ghost->SetOut(ghost_start + footage_duration);
@@ -342,10 +350,10 @@ void ImportTool::DropGhosts(bool insert)
     }
 
     if (behavior != kDWSDisable) {
-      ProjectPtr active_project = Core::instance()->GetActiveProject();
+      Project* active_project = Core::instance()->GetActiveProject();
 
       if (active_project) {
-        SequencePtr new_sequence = Core::instance()->CreateNewSequenceForProject(active_project.get());
+        SequencePtr new_sequence = Core::instance()->CreateNewSequenceForProject(active_project);
 
         new_sequence->set_default_parameters();
 
@@ -419,7 +427,12 @@ void ImportTool::DropGhosts(bool insert)
         video_input->SetStream(footage_stream);
         new NodeAddCommand(dst_graph, video_input, command);
 
-        new NodeEdgeAddCommand(video_input->output(), clip->texture_input(), command);
+
+        TransformDistortNode* transform = new TransformDistortNode();
+        new NodeAddCommand(dst_graph, transform, command);
+
+        new NodeEdgeAddCommand(video_input->output(), transform->texture_input(), command);
+        new NodeEdgeAddCommand(transform->output(), clip->texture_input(), command);
 
         /*
         MatrixGenerator* matrix = new MatrixGenerator();

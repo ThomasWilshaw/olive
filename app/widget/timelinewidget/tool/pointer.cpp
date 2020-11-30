@@ -52,6 +52,8 @@ void PointerTool::MousePress(TimelineViewMouseEvent *event)
   // Determine if item clicked on is selectable
   clicked_item_ = parent()->GetItemAtScenePos(event->GetCoordinates());
 
+  can_rubberband_select_ = false;
+
   bool selectable_item = (clicked_item_
                           && !parent()->GetTrackFromReference(clicked_item_->Track())->IsLocked());
 
@@ -121,21 +123,38 @@ void PointerTool::MousePress(TimelineViewMouseEvent *event)
 
     parent()->SignalSelectedBlocks(selected_blocks);
 
-  } else if (event->GetButton() == Qt::LeftButton) {
+  }
 
-    // Start rubberband drag
-    parent()->StartRubberBandSelect(true, !(event->GetModifiers() & Qt::AltModifier));
+  can_rubberband_select_ =  (event->GetButton() == Qt::LeftButton                              // Only rubberband select from the primary mouse button
+                             && (!selectable_item || drag_movement_mode_ == Timeline::kNone)); // And if no item was selected OR the item isn't draggable
 
-    rubberband_selecting_ = true;
-
+  if (can_rubberband_select_) {
+    drag_global_start_ = QCursor::pos();
   }
 }
 
 void PointerTool::MouseMove(TimelineViewMouseEvent *event)
 {
-  if (rubberband_selecting_) {
+  if (can_rubberband_select_) {
+
+    if (!rubberband_selecting_) {
+
+      // If we clicked an item but are rubberband selecting anyway, deselect it now
+      if (clicked_item_) {
+        parent()->RemoveSelection(clicked_item_);
+        parent()->SignalDeselectedBlocks({clicked_item_->block()});
+        clicked_item_ = nullptr;
+      }
+
+      parent()->StartRubberBandSelect(drag_global_start_);
+
+      rubberband_selecting_ = true;
+
+    }
+
     // Process rubberband select
     parent()->MoveRubberBandSelect(true, !(event->GetModifiers() & Qt::AltModifier));
+
   } else {
     // Process drag
     if (!dragging_) {
@@ -469,7 +488,7 @@ void PointerTool::ProcessDrag(const TimelineCoordinate &mouse_pos)
   }
 
   // Validate ghosts that are being moved (clips from other track types do NOT get moved)
-  {
+  if (track_movement != 0) {
     QVector<TimelineViewGhostItem*> validate_track_ghosts = parent()->GetGhostItems();
     for (int i=0;i<validate_track_ghosts.size();i++) {
       if (validate_track_ghosts.at(i)->GetTrack().type() != drag_track_type_) {
@@ -508,10 +527,11 @@ void PointerTool::ProcessDrag(const TimelineCoordinate &mouse_pos)
 
   // Regenerate tooltip and force it to update (otherwise the tooltip won't move as written in the
   // documentation, and could get in the way of the cursor)
+  rational tooltip_timebase = parent()->GetTimebaseForTrackType(drag_start_.GetTrack().type());
   QToolTip::hideText();
   QToolTip::showText(QCursor::pos(),
-                     Timecode::timestamp_to_timecode(Timecode::time_to_timestamp(time_movement, parent()->GetToolTipTimebase()),
-                                                     parent()->GetToolTipTimebase(),
+                     Timecode::timestamp_to_timecode(Timecode::time_to_timestamp(time_movement, tooltip_timebase),
+                                                     tooltip_timebase,
                                                      Core::instance()->GetTimecodeDisplay(),
                                                      true),
                      parent());
@@ -872,6 +892,8 @@ bool PointerTool::AddMovingTransitionsToClipGhost(Block* block,
 
 rational PointerTool::ValidateInTrimming(rational movement)
 {
+  bool first_ghost = true;
+
   foreach (TimelineViewGhostItem* ghost, parent()->GetGhostItems()) {
     if (ghost->GetMode() != Timeline::kTrimIn) {
       continue;
@@ -880,8 +902,11 @@ rational PointerTool::ValidateInTrimming(rational movement)
     rational earliest_in = RATIONAL_MIN;
     rational latest_in = ghost->GetOut();
 
+    rational ghost_timebase = parent()->GetTimebaseForTrackType(ghost->GetTrack().type());
+
+    // If the ghost must be at least one frame in size, limit the latest allowed in point
     if (!ghost->CanHaveZeroLength()) {
-      latest_in -= parent()->timebase();
+      latest_in -= ghost_timebase;
     }
 
     // Clamp adjusted value between the earliest and latest values
@@ -891,6 +916,11 @@ rational PointerTool::ValidateInTrimming(rational movement)
     if (clamped != adjusted) {
       movement = clamped - ghost->GetIn();
     }
+
+    if (first_ghost) {
+      movement = SnapMovementToTimebase(ghost->GetIn(), movement, ghost_timebase);
+      first_ghost = false;
+    }
   }
 
   return movement;
@@ -898,6 +928,8 @@ rational PointerTool::ValidateInTrimming(rational movement)
 
 rational PointerTool::ValidateOutTrimming(rational movement)
 {
+  bool first_ghost = true;
+
   foreach (TimelineViewGhostItem* ghost, parent()->GetGhostItems()) {
     if (ghost->GetMode() != Timeline::kTrimOut) {
       continue;
@@ -906,8 +938,10 @@ rational PointerTool::ValidateOutTrimming(rational movement)
     // Determine earliest and latest out points
     rational earliest_out = ghost->GetIn();
 
+    rational ghost_timebase = parent()->GetTimebaseForTrackType(ghost->GetTrack().type());
+
     if (!ghost->CanHaveZeroLength()) {
-      earliest_out += parent()->timebase();
+      earliest_out += ghost_timebase;
     }
 
     rational latest_out = RATIONAL_MAX;
@@ -918,6 +952,11 @@ rational PointerTool::ValidateOutTrimming(rational movement)
 
     if (clamped != adjusted) {
       movement = clamped - ghost->GetOut();
+    }
+
+    if (first_ghost) {
+      movement = SnapMovementToTimebase(ghost->GetOut(), movement, ghost_timebase);
+      first_ghost = false;
     }
   }
 

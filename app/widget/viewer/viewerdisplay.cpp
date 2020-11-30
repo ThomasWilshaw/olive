@@ -39,6 +39,7 @@ namespace olive {
 
 ViewerDisplayWidget::ViewerDisplayWidget(QWidget *parent) :
   ManagedDisplayWidget(parent),
+  deinterlace_texture_(nullptr),
   signal_cursor_color_(false),
   gizmos_(nullptr),
   gizmo_click_(false),
@@ -47,6 +48,8 @@ ViewerDisplayWidget::ViewerDisplayWidget(QWidget *parent) :
   deinterlace_(false)
 {
   connect(Core::instance(), &Core::ToolChanged, this, &ViewerDisplayWidget::UpdateCursor);
+
+  connect(this, &ViewerDisplayWidget::InnerWidgetMouseMove, this, &ViewerDisplayWidget::EmitColorAtCursor);
 
   // Initializes cursor based on tool
   UpdateCursor();
@@ -80,19 +83,10 @@ void ViewerDisplayWidget::UpdateCursor()
   }
 }
 
-QMatrix4x4 ViewerDisplayWidget::GetCompleteMatrixFlippedYTranslation()
-{
-  QMatrix4x4 mat = combined_matrix_;
-
-  mat.scale(1, -1, 1);
-
-  return mat;
-}
-
 void ViewerDisplayWidget::SetSignalCursorColorEnabled(bool e)
 {
   signal_cursor_color_ = e;
-  setMouseTracking(e);
+  inner_widget()->setMouseTracking(e);
 }
 
 void ViewerDisplayWidget::SetImage(FramePtr in_buffer)
@@ -121,6 +115,14 @@ void ViewerDisplayWidget::SetImage(FramePtr in_buffer)
 void ViewerDisplayWidget::SetDeinterlacing(bool e)
 {
   deinterlace_ = e;
+
+  if (deinterlace_) {
+    deinterlace_shader_ = renderer()->CreateNativeShader(ShaderCode(FileFunctions::ReadFileAsString(QStringLiteral(":/shaders/deinterlace.frag"))));
+  } else {
+    renderer()->DestroyNativeShader(deinterlace_shader_);
+    deinterlace_texture_ = nullptr;
+  }
+
   update();
 }
 
@@ -176,18 +178,18 @@ QPoint ViewerDisplayWidget::TransformViewerSpaceToBufferSpace(QPoint pos)
   * Inversion will only fail if the viewer has been scaled by 0 in any direction
   * which I think should never happen.
   */
-  return pos * GenerateWorldTransform().inverted();
+  return pos * GenerateGizmoTransform().inverted();
 }
 
 void ViewerDisplayWidget::mousePressEvent(QMouseEvent *event)
 {
   if (event->button() == Qt::LeftButton && gizmos_
-      && gizmos_->GizmoPress(gizmo_db_, TransformViewerSpaceToBufferSpace(event->pos()),
-                             QVector2D(GetTexturePosition(size())), size())) {
+      && gizmos_->GizmoPress(gizmo_db_, TransformViewerSpaceToBufferSpace(event->pos()))) {
 
     // Handle gizmo click
     gizmo_click_ = true;
     gizmo_drag_time_ = GetGizmoTime();
+    gizmo_start_drag_ = event->pos();
 
   } else if (IsHandDrag(event)) {
 
@@ -211,27 +213,6 @@ void ViewerDisplayWidget::mousePressEvent(QMouseEvent *event)
 
 void ViewerDisplayWidget::mouseMoveEvent(QMouseEvent *event)
 {
-  // Do this no matter what, emits signal to any pixel samplers
-  if (signal_cursor_color_) {
-    Color reference, display;
-
-    if (last_loaded_buffer_) {
-      QVector3D pixel_pos(static_cast<float>(event->x()) / static_cast<float>(width()) * 2.0f - 1.0f,
-                          static_cast<float>(event->y()) / static_cast<float>(height()) * 2.0f - 1.0f,
-                          0);
-
-      pixel_pos = GenerateWorldTransform().inverted() * pixel_pos;
-
-      int frame_x = qRound((pixel_pos.x() + 1.0f) * 0.5f * last_loaded_buffer_->width());
-      int frame_y = qRound((pixel_pos.y() + 1.0f) * 0.5f * last_loaded_buffer_->height());
-
-      reference = last_loaded_buffer_->get_pixel(frame_x, frame_y);
-      display = color_service()->ConvertColor(reference);
-    }
-
-    emit CursorColor(reference, display);
-  }
-
   // Handle hand dragging
   if (hand_dragging_) {
 
@@ -245,7 +226,8 @@ void ViewerDisplayWidget::mouseMoveEvent(QMouseEvent *event)
 
     // Signal movement
     gizmos_->GizmoMove(TransformViewerSpaceToBufferSpace(event->pos()),
-                       QVector2D(GetTexturePosition(size())), gizmo_drag_time_);
+                       gizmo_drag_time_);
+    gizmo_start_drag_ = event->pos();
     update();
 
   } else {
@@ -279,44 +261,58 @@ void ViewerDisplayWidget::mouseReleaseEvent(QMouseEvent *event)
   }
 }
 
-void ViewerDisplayWidget::OnInit()
-{
-  ManagedDisplayWidget::OnInit();
-}
-
 void ViewerDisplayWidget::OnPaint()
 {
   // Clear background to empty
-  renderer()->ClearDestination();
+  QColor bg_color = palette().window().color();
+  renderer()->ClearDestination(bg_color.redF(), bg_color.greenF(), bg_color.blueF());
 
   // We only draw if we have a pipeline
   if (last_loaded_buffer_ && color_service()) {
 
+    TexturePtr texture_to_draw = texture_;
+
     if (deinterlace_) {
-      qDebug() << "FIXME: Deinterlacing is currently broken, we're working on this...";
-      //color_service()->pipeline()->setUniformValue("ove_resolution", texture_.width(), texture_.height());
-      //color_service()->pipeline()->setUniformValue("ove_deinterlace", deinterlace_);
+      if (!deinterlace_texture_
+          || deinterlace_texture_->params() != texture_to_draw->params()) {
+        // (Re)create texture
+        deinterlace_texture_ = renderer()->CreateTexture(texture_to_draw->params());
+      }
+
+      ShaderJob job;
+      job.InsertValue(QStringLiteral("resolution_in"), ShaderValue(QVector2D(texture_to_draw->width(), texture_to_draw->height()), NodeParam::kVec2));
+      job.InsertValue(QStringLiteral("ove_maintex"), ShaderValue(QVariant::fromValue(texture_to_draw), NodeParam::kTexture));
+
+      renderer()->BlitToTexture(deinterlace_shader_, job, deinterlace_texture_.get());
+
+      texture_to_draw = deinterlace_texture_;
     }
 
     // Draw texture through color transform
-    renderer()->BlitColorManaged(color_service(), texture_, true,
-                                 VideoParams(width(), height(), static_cast<VideoParams::Format>(Config::Current()["OfflinePixelFormat"].toInt()), VideoParams::kInternalChannelCount),
-                                 GetCompleteMatrixFlippedYTranslation());
+    int device_width = width() * devicePixelRatioF();
+    int device_height = height() * devicePixelRatioF();
+    VideoParams::Format device_format = static_cast<VideoParams::Format>(Config::Current()["OfflinePixelFormat"].toInt());
+    VideoParams device_params(device_width, device_height, device_format, VideoParams::kInternalChannelCount);
+
+    renderer()->BlitColorManaged(color_service(), texture_to_draw, true, device_params, false,
+                                 combined_matrix_flipped_);
   }
 
   QTransform world_transform = GenerateWorldTransform();
 
   // Draw gizmos if we have any
   if (gizmos_) {
-    GizmoTraverser gt(QSize(gizmo_params_.width(), gizmo_params_.height()));
+    GizmoTraverser gt(QVector2D(gizmo_params_.width() * gizmo_params_.pixel_aspect_ratio().toDouble(),
+                                gizmo_params_.height()));
 
     rational node_time = GetGizmoTime();
 
-    gizmo_db_ = gt.GenerateDatabase(gizmos_, TimeRange(node_time, node_time));
+    gizmo_db_ = gt.GenerateDatabase(gizmos_, TimeRange(node_time,
+                                                       node_time + gizmo_params_.time_base()));
 
     QPainter p(inner_widget());
-    p.setWorldTransform(world_transform);
-    gizmos_->DrawGizmos(gizmo_db_, &p, QVector2D(GetTexturePosition(size())), size());
+    p.setWorldTransform(GenerateGizmoTransform());
+    gizmos_->DrawGizmos(gizmo_db_, &p);
   }
 
   // Draw action/title safe areas
@@ -361,11 +357,6 @@ void ViewerDisplayWidget::OnDestroy()
   texture_ = nullptr;
 }
 
-QMatrix4x4 ViewerDisplayWidget::GetMatrixTranslate()
-{
-  return translate_matrix_;
-}
-
 QPointF ViewerDisplayWidget::GetTexturePosition(const QPoint &screen_pos)
 {
   return GetTexturePosition(screen_pos.x(), screen_pos.y());
@@ -396,6 +387,10 @@ void ViewerDisplayWidget::UpdateMatrix()
 {
   combined_matrix_ = scale_matrix_ * translate_matrix_;
 
+  combined_matrix_flipped_.setToIdentity();
+  combined_matrix_flipped_.scale(1.0, -1.0, 1.0);
+  combined_matrix_flipped_ *= combined_matrix_;
+
   update();
 }
 
@@ -419,6 +414,34 @@ QTransform ViewerDisplayWidget::GenerateWorldTransform()
   world.translate(*(d + 12) * width() * 0.5 / *(d), *(d + 13) * height() * 0.5 / *(d + 5));
 
   return world;
+}
+
+QTransform ViewerDisplayWidget::GenerateGizmoTransform()
+{
+  QVector2D viewer_scale(GetTexturePosition(size()));
+  QTransform gizmo_transform = GenerateWorldTransform();
+  gizmo_transform.scale(viewer_scale.x(), viewer_scale.y());
+  gizmo_transform.scale(gizmo_params_.pixel_aspect_ratio().flipped().toDouble(), 1);
+  return gizmo_transform;
+}
+
+void ViewerDisplayWidget::EmitColorAtCursor(QMouseEvent *e)
+{
+  // Do this no matter what, emits signal to any pixel samplers
+  if (signal_cursor_color_) {
+    Color reference, display;
+
+    if (last_loaded_buffer_) {
+      QPointF pixel_pos = GenerateGizmoTransform().inverted().map(e->pos());
+
+      pixel_pos /= last_loaded_buffer_->video_params().divider();
+
+      reference = last_loaded_buffer_->get_pixel(qRound(pixel_pos.x()), qRound(pixel_pos.y()));
+      display = color_service()->ConvertColor(reference);
+    }
+
+    emit CursorColor(reference, display);
+  }
 }
 
 }

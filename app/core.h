@@ -199,11 +199,6 @@ public:
   const QStringList& GetRecentProjects() const;
 
   /**
-   * @brief Convenience function to retrieve a Project's shared pointer
-   */
-  ProjectPtr GetSharedPtrFromProject(Project* project) const;
-
-  /**
    * @brief Get the currently active project
    *
    * Uses the UI/Panel system to determine which Project was the last focused on and assumes this is the active Project
@@ -213,7 +208,7 @@ public:
    *
    * The active Project file, or nullptr if the heuristic couldn't find one.
    */
-  ProjectPtr GetActiveProject() const;
+  Project* GetActiveProject() const;
   ProjectViewModel* GetActiveProjectModel() const;
   Folder* GetSelectedFolderInActiveProject() const;
 
@@ -269,8 +264,8 @@ public:
   /**
    * @brief Closes a project
    */
-  bool CloseProject(ProjectPtr p, bool auto_open_new, CloseProjectBehavior& confirm_behavior);
-  bool CloseProject(ProjectPtr p, bool auto_open_new);
+  bool CloseProject(Project* p, bool auto_open_new, CloseProjectBehavior& confirm_behavior);
+  bool CloseProject(Project* p, bool auto_open_new);
 
   /**
    * @brief Closes all open projects
@@ -285,12 +280,17 @@ public:
   /**
    * @brief Check each footage object for whether it still exists or has changed
    */
-  bool ValidateFootageInLoadedProject(ProjectPtr project, const QString &project_saved_url);
+  bool ValidateFootageInLoadedProject(Project* project, const QString &project_saved_url);
 
   /**
    * @brief Changes the current language
    */
   bool SetLanguage(const QString& locale);
+
+  /**
+   * @brief Saves a specific project
+   */
+  bool SaveProject(Project *p);
 
   static const uint kProjectVersion;
 
@@ -461,14 +461,9 @@ private:
   void SetStartupLocale();
 
   /**
-   * @brief Saves a specific project
-   */
-  bool SaveProject(ProjectPtr p);
-
-  /**
    * @brief Performs a "save as" on a specific project
    */
-  bool SaveProjectAs(ProjectPtr p);
+  bool SaveProjectAs(Project *p);
 
   /**
    * @brief Adds a filename to the top of the recently opened projects list (or moves it if it already exists)
@@ -494,7 +489,7 @@ private:
   /**
    * @brief Internal function for saving a project to a file
    */
-  void SaveProjectInternal(ProjectPtr project);
+  void SaveProjectInternal(Project *project);
 
   /**
    * @brief Retrieves the currently most active sequence for exporting
@@ -509,7 +504,7 @@ private:
   /**
    * @brief List of currently open projects
    */
-  QList<ProjectPtr> open_projects_;
+  QList<Project*> open_projects_;
 
   /**
    * @brief Currently active tool
@@ -569,7 +564,7 @@ private slots:
   /**
    * @brief Adds a project to the "open projects" list
    */
-  void AddOpenProject(olive::ProjectPtr p);
+  void AddOpenProject(olive::Project* p);
 
   void AddOpenProjectFromTask(Task* task);
 
