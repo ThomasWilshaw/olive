@@ -27,6 +27,9 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include "project/project.h"
+#include "node/input/media/media.h"
+
 namespace olive {
 
 FootageRelinkDialog::FootageRelinkDialog(const QList<FootagePtr>& footage, QWidget* parent) :
@@ -96,6 +99,28 @@ void FootageRelinkDialog::BrowseForFootage()
       QTreeWidgetItem* item = table_->topLevelItem(index);
       item->setIcon(0, f->icon());
       item->setText(1, f->filename());
+
+      // Loop through all nodes to see if any need to be re-linked to this footage
+      QList<ItemPtr> sequences = f->project()->get_items_of_type(Item::kSequence);
+
+      foreach (ItemPtr s, sequences) {
+        const QList<Node*>& nodes = static_cast<Sequence*>(s.get())->nodes();
+        foreach (Node* n, nodes) {
+          if (n->IsMedia()) {
+            MediaInput* media_node = static_cast<MediaInput*>(n);
+
+            StreamPtr node_stream = media_node->stream();
+
+            if (node_stream->footage() == f.get()) {
+              foreach (StreamPtr str, f->streams()) {
+                if (node_stream->index() == str.get()->index()) {
+                  media_node->SetStream(str);
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

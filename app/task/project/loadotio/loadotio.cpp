@@ -222,11 +222,23 @@ bool LoadOTIOTask::Run()
 
             if (probed_item && probed_item->type() == Item::kFootage) {
               MediaInput* media = new MediaInput();
+              StreamPtr stream;
               if (track->track_type() == Timeline::kTrackTypeVideo) {
-                media->SetStream(probed_item->get_first_stream_of_type(Stream::kVideo));
+                stream = std::make_shared<VideoStream>();
+                stream = probed_item->get_first_stream_of_type(Stream::kVideo);
               } else {
-                media->SetStream(probed_item->get_first_stream_of_type(Stream::kAudio));
+                stream = std::make_shared<AudioStream>();
+                stream = probed_item->get_first_stream_of_type(Stream::kAudio);
               }
+              if (!stream) { 
+                // Create a dummy stream that contains enough info to relink later
+                stream = std::make_shared<Stream>();
+                stream->set_type(Stream::kUnknown);
+                stream->set_footage(probed_item.get());
+                stream->set_index(0);
+                stream->set_enabled(false);
+              }
+              media->SetStream(stream);
               sequence->AddNode(media);
 
               NodeParam::ConnectEdge(media->output(), static_cast<ClipBlock*>(block)->texture_input());
