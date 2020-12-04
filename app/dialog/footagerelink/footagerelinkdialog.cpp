@@ -95,6 +95,8 @@ void FootageRelinkDialog::BrowseForFootage()
     if (Footage::CompareFootageToItsFilename(f)) {
       // Set footage to valid and update icon
       f->SetValid();
+      relink_.append(f);
+      AttemptAutoRelink(f->filename());
 
       QTreeWidgetItem* item = table_->topLevelItem(index);
       item->setIcon(0, f->icon());
@@ -110,15 +112,48 @@ void FootageRelinkDialog::BrowseForFootage()
             MediaInput* media_node = static_cast<MediaInput*>(n);
 
             StreamPtr node_stream = media_node->stream();
-
-            if (node_stream->footage() == f.get()) {
-              foreach (StreamPtr str, f->streams()) {
-                if (node_stream->index() == str.get()->index()) {
-                  media_node->SetStream(str);
+            foreach (FootagePtr footage, relink_) {
+              if (node_stream->footage() == footage.get()) {
+                foreach (StreamPtr str, footage->streams()) {
+                  // Are there cases this will miss? E.g. loadingg proxies with no audio stream or something?
+                  if (node_stream->index() == str.get()->index()) {
+                    media_node->SetStream(str);
+                  }
                 }
               }
             }
           }
+        }
+      }
+    }
+  }
+}
+
+void FootageRelinkDialog::AttemptAutoRelink(QString valid_path)
+{
+  foreach(FootagePtr f, footage_) {
+    if (!f->IsValid()) {
+      QFileInfo f_filepath(f->filename());
+      QFileInfo valid_file(valid_path);
+      QFileInfo test_file;
+      QString test_path;
+
+      // Try same folder
+      // Needs to handle OS path splitters "/" vs "\"
+      test_path = valid_file.path() + "/" + f_filepath.fileName();
+      test_file.setFile(test_path);
+
+      if (test_file.exists()) {
+        f->set_filename(test_path);
+        if (Footage::CompareFootageToItsFilename(f)) {
+          f->SetValid();
+          relink_.append(f);
+          foreach(QTreeWidgetItem * item, table_->findItems(f_filepath.filePath(), Qt::MatchExactly, 1)) {
+            item->setIcon(0, f->icon());
+            item->setText(1, f->filename());
+          }
+        } else {
+          f->set_filename(f_filepath.absoluteFilePath());
         }
       }
     }

@@ -35,9 +35,13 @@ public:
   FootageRelinkDialog(const QList<FootagePtr>& footage, QWidget* parent = nullptr);
 
 private:
+  void AttemptAutoRelink(QString valid_path);
+
   QTreeWidget* table_;
 
   QList<FootagePtr> footage_;
+
+  QVector<FootagePtr> relink_;
 
 private slots:
   void BrowseForFootage();

@@ -316,6 +316,7 @@ bool Footage::CompareFootageToItsFilename(FootagePtr footage)
       if (item && item->type() == footage->type()) {
         // Item is the same type, that's a good sign. Let's look for any differences.
         // FIXME: Implement this
+        footage->ClearStreams();
         foreach(StreamPtr stream, item->streams()) {
             footage->add_stream(stream);
         }
