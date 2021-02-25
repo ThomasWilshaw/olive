@@ -76,7 +76,12 @@ Olive relies heavily on Qt for the UI code (as well as various data types). The 
 movable, dock-able panels (leveraging QDockWidget) that allow for a very customisable interface. 
 
 ### 4. Colour Management
-TODO
+If you're not familiar with colour management some good places to start are [here](https://cinematiccolor.org/)
+and [here](https://hg2dc.com/).
+
+Unlike most video editing software Olive is not based on outdated, hard coded colour assumptions
+but instead has a scene linear colour pipeline. This means that all colour operations can happen in 
+a physically correct way and that Olive can handle wide gamuts and high dynamic range imagery. 
 
 ## Code Map
 A shallow view of the directory structure of the code base which should give a reasonable
