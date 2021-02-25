@@ -63,7 +63,10 @@ movable, docakble panels (leveragnig QDockWidget) that allow for a very customis
 TODO
 
 ## Code Map
-
+An fairly shallow view of the directory structure of the code base which should give a reasonable
+indications of where to look for code. The code base is fairl inconsistently documented, some
+header files have extreamly detailed comments and others have none at all, however most function
+names are fairly explicit.
 ## /app
 All the source code is contained in this folder.
 
