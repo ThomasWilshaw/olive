@@ -1,8 +1,24 @@
 # Olive code Architecture
+This document describes the architecture and code layout of Olive, if you're looking for a user
+guide, [see here](https://github.com/olive-editor/olive/wiki/Olive-0.2.x-Quickstart).
 
 ## High level view
+Olive is a fully colour managed, node based and cross platform none linear editor that has been
+written from the ground up using cutting edge technologies, these include:
 
-Olive is a Qt based program. The code base can be more or less split into 4 sections:
+- [OpenImageIO](https://github.com/OpenImageIO/oiio) for still image input and output,
+- [OpenColorIO v2.0](https://opencolorio.org/) for colour management
+- [OpenEXR](https://www.openexr.com/) for the internal disk cache
+- [OpenTimelineIO](https://github.com/PixarAnimationStudios/OpenTimelineIO) for timeline
+  interchange.
+
+Olive also uses [Qt 5.15](https://doc.qt.io/qt-5/) for the UI and various data structures and 
+[FFmpeg](https://ffmpeg.org/) for all video and audio I/O.
+
+Olive's other key goals are to be both cross platform compatible (official builds include Mac, 
+Windows and CentOS 7) and to run on relatively low spec hardware. 
+
+The code base can be more or less split into 4 sections:
 
 1. Ingestion and caching,
 2. Node system,
