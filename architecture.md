@@ -11,41 +11,41 @@ Olive is a Qt based program. The code base can be more or less split into 4 sect
 
 ### 1. Ingestion and Caching
 
-Olive uses FFMpeg and OpenImageIO (OIIO) to read a large variety of inout media. The decoder class
+Olive uses FFMpeg and OpenImageIO (OIIO) to read a large variety of input media. The decoder class
 removes all the complexities of opening and reading various codecs. The decoder always returns a
 complete frame that may need to be converted to the correct pixel format. See `decoder.h` for more
 details.
 
-A key feature of Olive is the on disk caching system which allows for relatime playback with even
+A key feature of Olive is the on disk caching system which allows for real-time playback with even
 the most complex of node setups ([see here](https://blender.stackexchange.com/a/148466) for a 
-detailed overview of how quiockle EXRs can read and write). All frames are cached as linear EXRs 
-whoch can be read from disk in realtime in even the most minimialof systems. The cached frames are 
-given a hash which means footage that is reused or moved around does not need ot be recached, 
-allowing for a fairly seemless editing experience once all media has been cached.
+detailed overview of how quickly EXRs can read and write). All frames are cached as linear EXRs 
+which can be read from disk in real-time in even the most minimal of systems. The cached frames are 
+given a hash which means footage that is reused or moved around does not need to be recached, 
+allowing for a fairly seamless editing experience once all media has been cached.
 
-There is also a small playback cache that preloads a handfull of frames ahead of the cursor during
+There is also a small playback cache that preloads a handful of frames ahead of the cursor during
 playback. 
 
 ### 2. Node System
 
 The core of Olive, and what makes it unique amongst video editors, is the node system; the entire
 project is stored in a single graph. Nodes are like visual programming and allow a user to build
-an arbitarily complex set up. From an architectre point of view the node system consists of the
+an arbitrarily complex set up. From an architecture point of view the node system consists of the
 following parts:
- - The graph whoch manages adding, removing and connecting nodes together,
+ - The graph which manages adding, removing and connecting nodes together,
  - The nodes themselves,
  - The node table
 
 The graph is a Direct Acyclic Graph (DAG) which means each edge allows data to flow in only one
 direction and that feedback loops are not allowed. A node does not have to be connected to be part
-of the graph and infact when nodes are added with `NodeGraph::AddNode()` they are not connected by
-default. It is also inportant to note that when a node is removed with `NodeGraph::TakeNode()` it 
-is uncconected and removed from the graph but not destroyed. The class `NodeGraph` also contains a 
+of the graph and in fact when nodes are added with `NodeGraph::AddNode()` they are not connected by
+default. It is also important to note that when a node is removed with `NodeGraph::TakeNode()` it 
+is unconnected and removed from the graph but not destroyed. The class `NodeGraph` also contains a 
 few helper functions.
 
-The `Node` class is a simple base class for all nodes that is intended to be subclassed. It gives
-acces to various pieces of metedata about the node such as it's ID, name and description as well 
-as providing a alarge number of helper functions. The classes header file is very well documented
+The `Node` class is a simple base class for all nodes that is intended to be sub-classed. It gives
+access to various pieces of metadata about the node such as it's ID, name and description as well 
+as providing a large number of helper functions. The classes header file is very well documented
 and worth reading. 
 
 TODO: 
@@ -57,15 +57,15 @@ TODO:
 ### 3. UI
 
 Olive relies heavily on Qt for the UI code (as well as various data types). The UI is split into
-movable, docakble panels (leveragnig QDockWidget) that allow for a very customisable interface. 
+movable, dock-able panels (leveraging QDockWidget) that allow for a very customisable interface. 
 
 ### 4. Colour Management
 TODO
 
 ## Code Map
-An fairly shallow view of the directory structure of the code base which should give a reasonable
-indications of where to look for code. The code base is fairl inconsistently documented, some
-header files have extreamly detailed comments and others have none at all, however most function
+A shallow view of the directory structure of the code base which should give a reasonable
+indications of where to look for code. The code base is fairly inconsistently documented, some
+header files have extremely detailed comments and others have none at all, however most function
 names are fairly explicit.
 ## /app
 All the source code is contained in this folder.
@@ -74,7 +74,7 @@ All the source code is contained in this folder.
 Contains code for managing audio playback and display.
 
 ### /cli
-Manmges the command line interface.
+Manages the command line interface.
 
 ### /codec
 The code here manages the encoding and decoding of all media (video, images and audio). Olive
@@ -82,8 +82,8 @@ caches all footage as OpenEXR files for processing/storing on disk. Audio files 
 PPM files. The decoder class gives a simple interface to retrieve full frames of audio of video 
 data without having to deal with the complexities of the various codecs Olive can handle.
 
-We first probe a file to check it is valid and retireivs various useful metadata. If this is 
-succesful, any streams in the footage can be opened and accessed (some formats contain for 
+We first probe a file to check it is valid and retrieves various useful metadata. If this is 
+successful, any streams in the footage can be opened and accessed (some formats contain for 
 instance audio and video streams). Image data is stored in a `FramePtr` and audio in a 
 `SampleBuffer`.
 
@@ -95,7 +95,7 @@ The config handles all the program's system settings and is saved to an xml file
 
 ### /dialog
 Dialogs are any pop up window such as a colour picker or the about text. Dialogs often run tasks
-such as exporting the final video or inporting an OTIO file (see [/task](#/task)).
+such as exporting the final video or importing an OTIO file (see [/task](#/task)).
 
 ### /node
 Code for the node system. This includes the nodes themselves, processing and the graph logic.
@@ -122,11 +122,11 @@ Fragment and vertex shaders. Mostly for nodes but includes includes anything tha
 accelerated such as the waveform and histogram.
 
 ### /task
-Tasks are jobs that run in a seperate thread such as pre caching or importing/exporting a project.
+Tasks are jobs that run in a separate thread such as pre caching or importing/exporting a project.
 Tasks can be either blocking or none blocking.
 
 ### /threading
-Multithreading managment. Olive uses a ticket system, a ticket is a representative for a queued
+Multithreading management. Olive uses a ticket system, a ticket is a representative for a queued
 render job that other parts of the program can use when requesting video or audio. When you request
 a render job from the renderer, it returns a ticket. Most of the time, you'll want to receive a 
 signal when that ticket is done, however connecting a signal after you receive the ticket is a 
@@ -144,7 +144,7 @@ hand tools as well as area specific tools such as adding transitions in the time
 
 ### /ts
 Translation code. At time of writing this just includes en_US but there are various community 
-submitted translatiopns in the pipeline. Contributions are welcome.
+submitted translations in the pipeline. Contributions are welcome.
 
 ### /ui
 Contains SVGs and other graphics used in Olive's UI as well as the Qt code they require.
@@ -152,7 +152,7 @@ Contains SVGs and other graphics used in Olive's UI as well as the Qt code they 
 ### /undo
 Undo stack code and a base class for all undo commands. Olive uses Qt's undo system and any 
 undoable command has to be created as a undo class the also redoes the command. See Qt's 
-dcumentation for more details.
+documentation for more details.
 
 ### /widget
 All of Olive's custom widgets. Widgets extend Qt's QWidget class and quite a few are based 
@@ -187,7 +187,7 @@ CMake files for discovering the required and optional libraries.
   _What is the MACOs stuff for?_
 
 ## /docker
-Contains the Docker files for Olive's Linux continous intergration, see the README for more 
+Contains the Docker files for Olive's Linux continuous integration, see the README for more 
 details. Based on the 
 [Academy Software Foundation's Docker](https://github.com/AcademySoftwareFoundation/aswf-docker) 
 implementation .
