@@ -1,4 +1,4 @@
-# Olive code Architecture
+# Olive Code Architecture
 This document describes the architecture and code layout of Olive, if you're looking for a user
 guide, [see here](https://github.com/olive-editor/olive/wiki/Olive-0.2.x-Quickstart).
 
@@ -188,7 +188,7 @@ Initialises Qt and various other libraries as well as starting the Command Line 
 if it is required.
 
 ## /cmake
-CMake files for discovering the required and optional libraries.
+CMake files for discovering the required and optional libraries and some Mac OS app info.
 
  __Required__
  - FFmpeg
@@ -200,13 +200,11 @@ CMake files for discovering the required and optional libraries.
   - GoogleCrashpad
   - OpenTimelineIO
 
-  _What is the MACOs stuff for?_
-
 ## /docker
 Contains the Docker files for Olive's Linux continuous integration, see the README for more 
 details. Based on the 
 [Academy Software Foundation's Docker](https://github.com/AcademySoftwareFoundation/aswf-docker) 
-implementation .
+implementation.
 
 ## Files
 
