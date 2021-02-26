@@ -17,19 +17,22 @@ Olive is open source and cross-platform (Linux, Windows, macOS).
 It has been written in modern C++ from the ground up using cutting edge
 technologies. These include:
 
-- [OpenColorIO v2.0](https://opencolorio.org/) for color management
-- [OpenImageIO](https://github.com/OpenImageIO/oiio) for still image input and output
+- [OpenColorIO v2.0](https://opencolorio.org/) (OCIO) for color management
+- [OpenImageIO](https://github.com/OpenImageIO/oiio)
+  (OIIO) for still image input and output
 - [OpenEXR](https://www.openexr.com/) for the internal disk cache
 - [OpenTimelineIO](https://github.com/PixarAnimationStudios/OpenTimelineIO)
-  for timeline interchange
+  (OTIO) for timeline interchange
 
 Notably, it is not based on the MLT framework unlike several other open source
 video editors. It utilizes GPU acceleration throughout for high performance.
 
 Olive also uses:
 
-- [Qt 5](https://doc.qt.io/qt-5/) for the UI and various data structures,
-  and more generally as platform abstraction
+- [Qt 5](https://doc.qt.io/qt-5/) for the user interface (UI), various data
+  structures, and more generally as platform abstraction
+- [OpenGL](https://www.khronos.org/registry/OpenGL/index_gl.php) as graphics
+  API and its shading language GLSL
 - [FFmpeg](https://ffmpeg.org/) for all video and audio encoding and decoding
 - [CMake](https://cmake.org/) as its build system
 
@@ -37,7 +40,7 @@ Olive also uses:
 
 - Accurate pixel / color management
 - Node-based compositing
-- Fast workflow and rendering
+- Efficient workflow and rendering
 - Easy interchange
 - Be able to run on relatively low spec hardware
 
@@ -130,19 +133,25 @@ The code base is fairly inconsistently documented. Some header files have
 extremely detailed comments and others have none at all, however most function
 names are fairly explicit.
 
+- `/.github`
+
+  Files related to GitHub.com features like GitHub Actions workflows and
+  issue templates.
+
 - `/app`
 
-  All the source code is contained in this folder.
-
-  - `core.cpp`
-
-    The main central Olive application instance. Allows for a lot of the interaction between 
-    various sections of the code base.
+  All the application source code is contained in this folder.
 
   - `main.cpp`
 
-    Initializes Qt and various other libraries as well as starting the Command Line Interface
-    if it is required.
+    Initializes Qt and various other libraries. It also contains the command
+    line parsing to decide whether Olive should run with a graphical interface
+    or in headless mode (incomplete).
+
+  - `core.cpp`
+
+    The central Olive application instance, started by `main.cpp`. Allows for a
+    lot of the interaction between various sections of the code base.
 
   - `/audio`
 
@@ -150,39 +159,52 @@ names are fairly explicit.
 
   - `/cli`
 
-    Manages the command line interface.
+    Functionality related to the command line interface (incomplete).
 
   - `/codec`
-    The code here manages the encoding and decoding of all media (video, images and audio). Olive
-    caches all footage as OpenEXR files for processing/storing on disk. Audio files are converted to 
-    PPM files. The decoder class gives a simple interface to retrieve full frames of audio of video 
-    data without having to deal with the complexities of the various codecs Olive can handle.
 
-    We first probe a file to check it is valid and retrieves various useful metadata. If this is 
-    successful, any streams in the footage can be opened and accessed (some formats contain for 
-    instance audio and video streams). Image data is stored in a `FramePtr` and audio in a 
+    The code here manages the encoding and decoding of all media (video, images
+    and audio). Olive caches all footage as OpenEXR files on disk. Audio files
+    are converted to PPM files. The decoder class gives a simple interface to
+    retrieve full frames of audio or video data without having to deal with the
+    complexities of the various codecs Olive can handle.
+
+    We first probe a file to check if it is valid and retrieve various useful
+    metadata. If this is successful, any streams in the medium can be opened
+    and accessed. Some file formats contain multiple audio, video, subtitle and
+    other streams. Image data is stored in a `FramePtr` and audio in a 
     `SampleBuffer`.
 
   - `/common`
 
-    Contains various small useful classes that are used all over the code base.
+    Contains various utility classes that are used all over the code base, such
+    as file functions, math helpers and custom data types.
 
   - `/config`
 
-    The config handles all the program's system settings and is saved to an xml file.
+    This code handles all the program's system settings and is saved to an XML
+    file.
 
   - `/dialog`
 
-    Dialogs are any pop up window such as a color picker or the about text. Dialogs often run tasks
-    such as exporting the final video or importing an OTIO file (see `/task`)
+    Dialogs are any pop-up window such as a color picker or the about box.
+    Dialogs often run tasks such as exporting the final video or importing an
+    OTIO file (see `/task`).
 
   - `/node`
 
-    Code for the node system. This includes the nodes themselves, processing and the graph logic.
+    Code for the node system. This includes the nodes themselves, processing
+    and the graph logic.
 
   - `/packaging`
 
-    Platform specific files for compiling and instillation.
+    Platform-specific files for creating packages:
+    - AppImage for Linux
+    - NSIS installer and a portable version for Windows
+    - Application bundle (`.app`) for macOS
+
+    Note that the metadata template file for macOS is at
+    `/cmake/MacOSXBundleInfo.plist.in`.
 
   - `/panel`
 
@@ -190,37 +212,43 @@ names are fairly explicit.
 
   - `/project`
 
-    Handles assets a settings for a specific project, these include:
+    Handles assets and settings for specific projects. These include:
     - Footage
     - Sequences
     - Folders
     - Project Settings
     - Window Layout
 
+    Also contains the code for saving and loading project files.
+
   - `/render`
 
-    Rendering code including color management, threading, OpenGl processing and frame caching.
+    Code color management, threading, frame caching and the OpenGL renderer.
 
   - `/shaders`
 
-    Fragment and vertex shaders. Mostly for nodes but includes includes anything that is OpenGL 
-    accelerated such as the waveform and histogram.
+    Fragment and vertex shaders written in OpenGL Shading Language (GLSL).
+    Mostly for the user-visible nodes that enable compositing and effects, but
+    includes anything that is GPU accelerated such as the waveform monitor and
+    histogram.
 
   - `/task`
 
-    Tasks are jobs that run in a separate thread such as pre caching or importing/exporting a project.
-    Tasks can be either blocking or none blocking.
+    Tasks are jobs that run in a separate thread such as pre-caching or
+    importing/exporting a project. Tasks can be either blocking or non-blocking.
 
   - `/threading`
 
-    Multi-threading management. Olive uses a ticket system, a ticket is a representative for a queued
-    render job that other parts of the program can use when requesting video or audio. When you request
-    a render job from the renderer, it returns a ticket. Most of the time, you'll want to receive a 
-    signal when that ticket is done, however connecting a signal after you receive the ticket is a 
-    potential race condition, since the ticket may finish before the signal is connected. A watcher is 
-    a separate convenience class to solve this issue. It does some extra mutexing so that if you 
-    connect it and then give it a ticket, you can be sure that the signal is emitted whether the 
-    ticket is already finished or not.
+    Multi-threading management. Olive uses a ticket system. A ticket represents
+    a queued render job that other parts of the program can use when requesting
+    video or audio. When you request a render job from the renderer, it returns
+    a ticket. Most of the time, you will want to receive a signal when that
+    ticket is done, however connecting a signal after you receive the ticket is
+    a potential race condition, since the ticket may finish before the signal
+    is connected. A watcher is a separate convenience class to solve this issue.
+    It does some extra mutexing so that if you connect it and then give it a
+    ticket, you can be sure that the signal is emitted whether the ticket is
+    already finished or not.
 
   - `/timeline`
 
@@ -228,30 +256,39 @@ names are fairly explicit.
 
   - `/tool`
 
-    Enum of the various tools that can be used across various panels. This includes the pointer and 
-    hand tools as well as area specific tools such as adding transitions in the timeline.
+    Enum of the various tools that can be used across various panels. This
+    includes the pointer and hand tool as well as area-specific tools such as
+    adding transitions in the timeline.
 
   - `/ts`
 
-    Translation code. At time of writing this just includes en_US but there are various community 
-    submitted translations in the pipeline. Contributions are welcome.
+    Translation source files. The language used in Olive's code base is
+    American English (`en_US`), but it uses
+    [Qt's internationalization](https://doc.qt.io/qt-5/internationalization.html)
+    capabilities to support multiple languages in the UI. There are several
+    community submitted translations in the pipeline. Contributions are welcome.
+    See [Translating Olive](https://github.com/olive-editor/olive/wiki/Translations)
+    for details on the process.
 
   - `/ui`
 
-    Contains SVGs and other graphics used in Olive's UI as well as the Qt code they require.
+    Contains SVG files and other graphics used in Olive's UI as well as the Qt
+    code they require.
 
   - `/undo`
 
-    Undo stack code and a base class for all undo commands. Olive uses Qt's undo system and any 
-    undoable command has to be created as a undo class the also redoes the command. See Qt's 
-    documentation for more details.
+    Undo stack code and a base class for all undo commands. Olive uses
+    [Qt's undo framework](https://doc.qt.io/qt-5/qundo.html). Any undoable
+    command has to be created as an undo class that also redoes the command.
 
   - `/widget`
 
-    All of Olive's custom widgets. Widgets extend Qt's QWidget class and quite a few are based 
-    off existing Qt widgets.
+    All of Olive's custom widgets. Widgets extend
+    [Qt's QWidget](https://doc.qt.io/qt-5/qtwidgets-index.html) class and quite
+    a few are based off existing Qt widgets.
 
-    It is worth noting that panels are just widgets the inherit from the panel base class.
+    It is worth noting that panels are just widgets which inherit from the
+    panel base class.
 
   - `/window`
 
@@ -259,7 +296,7 @@ names are fairly explicit.
 
 - `/cmake`
 
-  CMake files for discovering the required and optional libraries and some Mac OS app info.
+  CMake files for discovering the required and optional libraries.
 
   __Required__
   - FFmpeg
@@ -268,12 +305,12 @@ names are fairly explicit.
   - OpenImageIO
 
   __Optional__
-  - GoogleCrashpad
+  - GoogleCrashpad (and `minidump_stackwalk` from Breakpad)
   - OpenTimelineIO
 
 - `/docker`
 
-  Contains the Docker files for Olive's Linux continuous integration, see the README for more 
-  details. Based on the 
-  [Academy Software Foundation's Docker](https://github.com/AcademySoftwareFoundation/aswf-docker) 
-  implementation.
+  Contains the Docker files for Olive's Linux build container, which is used for
+  continuous integration (CI) / nightly builds. Based on the Docker images of the
+  [Academy Software Foundation](https://github.com/AcademySoftwareFoundation/aswf-docker).
+  Also see the [Docker README](docker/README.md).
