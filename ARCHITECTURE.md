@@ -296,21 +296,40 @@ names are fairly explicit.
 
 - `/cmake`
 
-  CMake files for discovering the required and optional libraries.
-
-  __Required__
-  - FFmpeg
-  - OpenColorIO
-  - OpenEXR
-  - OpenImageIO
-
-  __Optional__
-  - GoogleCrashpad (and `minidump_stackwalk` from Breakpad)
-  - OpenTimelineIO
+  CMake modules for discovering required and optional [dependencies](#dependencies).
+  Note that CMake also has built-in modules for common libraries and tools.
 
 - `/docker`
 
   Contains the Docker files for Olive's Linux build container, which is used for
-  continuous integration (CI) / nightly builds. Based on the Docker images of the
-  [Academy Software Foundation](https://github.com/AcademySoftwareFoundation/aswf-docker).
+  continuous integration (CI) / nightly builds.
   Also see the [Docker README](docker/README.md).
+
+## Dependencies
+
+- __Qt__ >= 5.6
+  - Qt Base (Core, GUI, Widgets etc.)
+  - Qt Multimedia (audio input/output)
+  - Qt Tools (translation, packaging)
+  - Qt SVG (currently unused)
+- __OpenColorIO__ 2.0.0
+- __OpenImageIO__ 2.1.12
+- __OpenEXR__
+- __FFmpeg__ >= 3.0
+  - avutil
+  - avcodec
+  - avformat
+  - avfilter
+  - swscale
+  - swresample
+- __OpenTimelineIO__ (optional)
+- __Google Crashpad__ (optional)
+- __Breakpad__ (optional, only `minidump_stackwalk` binary)
+- __OpenGL__ (`GL/gl.h` on Linux)
+
+## Build Environment
+
+- __Git__
+- __CMake__ >= 3.13
+- __x64 Toolchain__ (GCC, Clang, MSVC)
+- __Doxygen__ (optional)
