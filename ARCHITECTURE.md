@@ -64,9 +64,20 @@ A key feature of Olive is the on disk caching system which allows for real-time
 playback with even the most complex of node setups. All frames are cached as
 linear EXRs which can be read from disk in real-time in even the most minimal
 of systems (see this [performance analysis](https://blender.stackexchange.com/a/148466)).
-The cached frames are given a hash which means footage that is reused or moved
-around does not need to be recached, allowing for a fairly seamless editing
-experience once all media has been cached.
+The cached frames are given a unique hash, hashing is a way to determine whether a frame has 
+changed (or more specifically, to generate a unique ID for every frame) without doing any actual
+image generation, which is very expensive. We employ a lot of optimizations to prevent unnecessarily
+changing the hash and forcing a re-render.
+
+For example, "track" nodes don't affect the resulting image at all so they don't add to the hash.
+All they do is forward to the clip at that time. Likewise, the clip itself doesn't affect the image,
+it just transforms the time, so it doesn't add to the hash either. Effectively that means if you
+have footage -> clip -> track -> viewer, the footage is the only node that actually gets hashed (at
+a time transformed by the track and clip), meaning that footage can be anywhere in the sequence, and
+as far as the hash is concerned (as long as no other nodes have affected the final image), the hash
+is the same. That's how pre-caching works, it caches a footage node at the sequence's resolution and
+the rest of the program is able to re-use it.There are more optimizations than that, but those are
+the biggest ones.
 
 There is also a small playback cache that preloads a handful of frames ahead
 of the cursor during playback. If pre-rendering cannot keep up with the
