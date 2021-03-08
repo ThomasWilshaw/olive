@@ -143,23 +143,22 @@ can handle wide gamuts and high dynamic range imagery.
 Whilst color management is woven into the entire code base the two main classes that deal with it
 are `colormanager.h` and `colorprocessor.h`. To understand these classes you need to first
 understand how OCIO works in principle. OCIO uses config files (see the folder `ocioconf` for 
-Olive's built in default config, user configs can be used instead) that define all the color spaces it 
-knows about as transforms to and from a reference space (usually a linear, wide gamut space such as
-Rec.2020 or ACES CG).
+Olive's built in default config, user configs can be used instead) that define all the color spaces 
+in that configs color 'universe'. The config also supplies all the transforms to and from these
+color spaces to a single reference space (usually a linear, wide gaut space such as Rec.2020). 
 
-When footage is imported into Olive it is run through the corresponding transforms to get it into
-this reference space. Most image manipulation happens in this reference space. When pixels need to
-be displayed they are run through an output transform which takes them from the reference space to a
-display space such as sRGB. Bear in mind this is a very simplified explanation and see the
-[OCIO documentation](https://opencolorio.readthedocs.io/en/latest/) for the full details.
+When footage is imported into Olive it is run through the corresponding transforms to convert it
+from its color space to the reference space, most image manipulation happens in this reference space.
+When pixels need to be displayed they are run through an output transform which takes them from the 
+reference space to a display space such as sRGB. Bear in mind this is a very simplified explanation 
+and see the [OCIO documentation](https://opencolorio.readthedocs.io/en/latest/) for the full details.
 
 To access the color spaces available in the config (whether for building transforms or for menus in
-the UI) use `Colormanger` class and to actually use a create a transform and use it, use the
-`ColorProcessor` class.
+the UI) use `Colormanger` class and to create a transform and use it, use the `ColorProcessor` class.
 
-The main takeaway here is that anytime pixels are modified, displayed or otherwise accessed it is 
-very important to be aware of what color space they are in and what space the need to be in to do
-the required operation. 
+The main point to takeaway here is that anytime pixels are modified, displayed or otherwise accessed
+it is very important to be aware of what color space they are in and what space the need to be in to
+do the required operation. 
 
 ## Code Layout
 
