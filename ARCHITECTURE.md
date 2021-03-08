@@ -63,11 +63,17 @@ converted to the correct pixel format. See `decoder.h` for more details.
 A key feature of Olive is the on disk caching system which allows for real-time
 playback with even the most complex of node setups. All frames are cached as
 linear EXRs which can be read from disk in real-time in even the most minimal
-of systems (see this [performance analysis](https://blender.stackexchange.com/a/148466)).
+of systems (see this [performance analysis](https://blender.stackexchange.com/a/148466)). By default
+Olive has a single cache folder that is used across all projects, this means that a footage cached
+anywhere is available in any project, this also means you can pre cache all you footage before using
+it anywhere.
+
 The cached frames are given a unique hash, hashing is a way to determine whether a frame has 
 changed (or more specifically, to generate a unique ID for every frame) without doing any actual
-image generation, which is very expensive. We employ a lot of optimizations to prevent unnecessarily
-changing the hash and forcing a re-render.
+image generation, which is very expensive. The hash is also dependant on the cache resolution, i.e.
+if you change from a half resolution cache to a quarter resolution the footage will need to be re
+cached. We employ a lot of optimizations to prevent unnecessarily changing the hash and forcing a 
+re-render.
 
 For example, "track" nodes don't affect the resulting image at all so they don't add to the hash.
 All they do is forward to the clip at that time. Likewise, the clip itself doesn't affect the image,
@@ -79,10 +85,9 @@ is the same. That's how pre-caching works, it caches a footage node at the seque
 the rest of the program is able to re-use it.There are more optimizations than that, but those are
 the biggest ones.
 
-There is also a small playback cache that preloads a handful of frames ahead
-of the cursor during playback. If pre-rendering cannot keep up with the
-playback speed, then Olive falls back to real-time rendering. It also does
-so while you tweak parameters to provide quick feedback.
+There is also a small playback cache that preloads a handful of frames ahead of the cursor during
+playback. If pre-rendering cannot keep up with the playback speed, then Olive falls back to
+real-time rendering. It also does so while you tweak parameters to provide quick feedback.
 
 ### Node System
 
