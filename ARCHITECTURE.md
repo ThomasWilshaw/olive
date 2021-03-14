@@ -112,10 +112,21 @@ It is also important to note that when a node is removed with `NodeGraph::TakeNo
 it is unconnected and removed from the graph but not destroyed. The class
 `NodeGraph` also contains a few helper functions.
 
+The graph itself is quite simple, it consists of a list of existing nodes and relies on 
+`QObject::childEvent` for adding/removing nodes via Qt's parent/child system. When a node is created, 
+setting the graph as its parent is all that is needed to add it to the graph. Edges are handled by
+the nodes themselves. `nodeviewundo.h` covers most of the user commands for the node graph (adding/
+removing nodes etc.).
+
 The `Node` class is a simple base class for all nodes that is intended to be
 sub-classed. It gives access to various pieces of metadata about the node such
 as its ID, name and description as well as providing a large number of helper
 functions. The class' header file is very well documented and worth reading. 
+
+A node can be thought of as a function box that takes some or all of the input channels and does
+something with them. 
+
+
 
 <!--
 TODO:
