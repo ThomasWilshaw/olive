@@ -245,13 +245,21 @@ names are fairly explicit.
 
   - `/packaging`
 
-    Platform-specific files for creating packages:
-    - AppImage for Linux
-    - NSIS installer and a portable version for Windows
-    - Application bundle (`.app`) for macOS
+    Platform-specific files to create application packages for distribution.
+    
+    - `/linux`
 
-    Note that the metadata template file for macOS is at
-    `/cmake/MacOSXBundleInfo.plist.in`.
+      Metadata files and icons to create an AppImage for Linux.
+
+    - `/macos`
+
+      Metadata template file and icon to create an application bundle (`.app`)
+      for macOS.
+
+    - `/windows`
+
+      Metadata files and icons for the Windows executable and a script file to
+      build an installer using Nullsoft Scriptable Install System (NSIS).
 
   - `/panel`
 
