@@ -223,6 +223,9 @@ bool LoadOTIOTask::Run()
 
               QFileInfo info(probed_item->filename());
               probed_item->SetLabel(info.fileName());
+
+              FolderAddChild add(sequence_footage, probed_item, false);
+              add.redo();
             }
 
             Track::Reference reference;
@@ -236,9 +239,6 @@ bool LoadOTIOTask::Run()
             QString output_id = reference.ToString();
 
             Node::ConnectEdge(NodeOutput(probed_item, output_id), NodeInput(block, ClipBlock::kBufferIn));
-
-            FolderAddChild add(sequence_footage, probed_item, false);
-            add.redo();
           }
         }
 
